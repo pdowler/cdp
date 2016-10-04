@@ -2,4 +2,4 @@ language: java
 jdk:
   - openjdk7
   - oraclejdk8
-script: for mod in cadc-cdp cadc-cdp-server; do cd $mod; gradle assemble check install || break -1; cd ..; done
+script: for mod in cadc-cdp cadc-cdp-server cadc-cert-gen; do cd $mod; gradle assemble check install || break -1; cd ..; done
