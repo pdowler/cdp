@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+    id 'maven'
+    id 'maven-publish'
+    id 'application'
+}
+
+repositories {
+    jcenter()
+    mavenLocal()
+}
+
+sourceCompatibility = 1.7
+
+group = 'org.opencadc'
+
+version = '1.0'
+
+mainClassName = 'ca.nrc.cadc.cert.Main'
+
+dependencies {
+    compile 'log4j:log4j:1.+'
+
+    compile 'org.opencadc:cadc-log:1.+'
+    compile 'org.opencadc:cadc-util:1.+'
+    compile 'org.opencadc:cadc-cdp:1.+'
+    
+    runtime 'net.sourceforge.jtds:jtds:1.+'
+}
