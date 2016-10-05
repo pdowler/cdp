@@ -99,8 +99,14 @@ public class Main
 
     private int doit(final String[] args) throws Exception
     {
-        LogArgUtil.initialize(new String[]{"ca", "net", "com", "org",
-                                           "edu"}, args);
+        LogArgUtil.initialize(new String[]
+        {
+            "ca.nrc.cadc.cert",
+            "ca.nrc.cadc.cred",
+            "ca.nrc.cadc.net"
+                
+        }, args);
+        
         this.argMap = new ArgumentMap(args);
         if (this.argMap.isSet(ARG_HELP) || this.argMap.isSet(ARG_H))
         {

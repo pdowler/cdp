@@ -62,7 +62,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMReader;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
@@ -73,7 +72,11 @@ import ca.nrc.cadc.cred.client.CredClient;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.ArgumentMap;
 
-
+/**
+ * Generates a new certificate using CDP client API.
+ * 
+ * @author pdowler
+ */
 public class CertGenAction extends DbCertGenAction
 {
     private static final Logger LOGGER = Logger.getLogger(CertGenAction.class);
@@ -132,7 +135,7 @@ public class CertGenAction extends DbCertGenAction
         {
             // create a cert for a single user
             HttpPrincipal useridPrincipal = new HttpPrincipal(userid);
-            X500Principal userDN = super.getCADCUserDN(useridPrincipal);
+            X500Principal userDN = super.getCertificateDN(useridPrincipal);
             LOGGER.debug("About to create certificate for user " + userid + " with DN " + userDN.toString());
             generateCertificate(userDN);
             msg("New user DN: " + userDN.toString());
@@ -141,7 +144,7 @@ public class CertGenAction extends DbCertGenAction
         {
             // renew certs for all users who's are about to expire
             int count = 0;
-            X500Principal[] userDNs = getExpiringCADC(super.expiring);
+            X500Principal[] userDNs = getExpiring(super.expiring);
             if (dryRun)
             {
                 for (X500Principal userDN : userDNs)
@@ -270,28 +273,5 @@ public class CertGenAction extends DbCertGenAction
         msg("Generated certificate for " + noWhitespaceDN);
     }
 
-    private X500Principal[] getExpiringCADC(int expire)
-    {
-        // @formatter:off
-        String query = "select canon_dn"
-                       + " from "
-                       + "     archive.dbo.x509_certificates "
-                       + " where "
-                       + "     canon_dn like 'cn=%&____,ou=cadc,o=hia,c=ca' escape '&' "
-                       + "     and datediff(dd, current_date(), exp_date) < ? ";
-        // @formatter:on
-        JdbcTemplate jdbc = new JdbcTemplate(ds);
-        @SuppressWarnings("unchecked")
-        List<String> rsList = (List<String>) jdbc.queryForList(query,
-                                                               new Object[]{
-                                                                       expire}, String.class);
-        X500Principal[] result = new X500Principal[rsList.size()];
-        Iterator<String> it = rsList.iterator();
-        for (int i = 0; i < result.length; i++)
-        {
-            result[i] = new X500Principal(it.next());
-        }
-        return result;
-    }
 
 }

@@ -34,6 +34,7 @@
 
 package ca.nrc.cadc.cert;
 
+import ca.nrc.cadc.auth.HttpPrincipal;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -45,22 +46,15 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import ca.nrc.cadc.util.ArgumentMap;
 import ca.nrc.cadc.util.StringUtil;
+import javax.security.auth.x500.X500Principal;
 
 
 
 public abstract class AbstractCertGenAction implements PrivilegedAction<Object>
 {
-    static final File SERVOPS_PEM_FILE =
-            new File(System.getProperty("user.home") + "/.pub/proxy.pem");
+    private static Logger LOGGER = Logger.getLogger(AbstractCertGenAction.class);
 
-    private static Logger LOGGER = Logger
-            .getLogger(AbstractCertGenAction.class);
-
-    public static final URI CRED_SERVICE_ID =
-            URI.create("ivo://cadc.nrc.ca/cred");
-
-    protected String server = "SYBASE"; // default server
-    protected String database = "archive"; // default database
+    public static final URI CRED_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/cred");
 
     protected int expiring;
     protected String userid;
@@ -102,7 +96,10 @@ public abstract class AbstractCertGenAction implements PrivilegedAction<Object>
         return true;
     }
 
-
+    abstract protected X500Principal[] getExpiring(int expire);
+    
+    abstract protected X500Principal getCertificateDN(HttpPrincipal userId);
+    
     private int parseExpire(ArgumentMap argMap)
     {
         int expire = 0;

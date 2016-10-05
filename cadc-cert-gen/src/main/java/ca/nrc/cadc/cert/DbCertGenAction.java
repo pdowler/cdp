@@ -47,22 +47,26 @@ import ca.nrc.cadc.db.ConnectionConfig;
 import ca.nrc.cadc.db.DBConfig;
 import ca.nrc.cadc.db.DBUtil;
 import ca.nrc.cadc.util.ArgumentMap;
+import java.util.Iterator;
+import java.util.List;
 
 /**
- * Represents a AbstractCertGenAction that needs DB connections
+ * 
+ * @author pdowler
  */
 public abstract class DbCertGenAction extends AbstractCertGenAction
 {
-    private static Logger LOGGER = Logger
-            .getLogger(DbCertGenAction.class);
+    private static Logger LOGGER = Logger.getLogger(DbCertGenAction.class);
 
+    protected String server = "SYBASE"; // default server
+    protected String database = "archive"; // default database
+    
     // datasource to the database
     protected DataSource ds;
 
     protected static final String TMP_TABLE = "#tmptable";
 
-    public static final String GENERATE_DN_Q = "select dbo.genDN(?)";
-
+    //public static final String GENERATE_DN_Q = "select dbo.genDN(?)";
 
     @Override
     public boolean init(final ArgumentMap argMap) throws IOException
@@ -73,24 +77,6 @@ public abstract class DbCertGenAction extends AbstractCertGenAction
         }
         initDbConnection(argMap);
         return true;
-    }
-
-    /**
-     * Returns DN of a cadc user
-     *
-     * @param userId The HTTP Principal to get the DN for.
-     * @return X500Principal, or null.
-     */
-    protected X500Principal getCADCUserDN(HttpPrincipal userId)
-    {
-        final JdbcTemplate jdbc = new JdbcTemplate(ds);
-
-        @SuppressWarnings("unchecked")
-        final String userDN = (String) jdbc.queryForObject(GENERATE_DN_Q,
-                                                           new Object[]{
-                                                                   userId.getName()}, String.class);
-
-        return (userDN == null) ? null : new X500Principal(userDN);
     }
 
     private void initDbConnection(ArgumentMap argMap) throws IOException
@@ -128,6 +114,55 @@ public abstract class DbCertGenAction extends AbstractCertGenAction
         LOGGER.debug("conCfg=" + conCfg);
         ds = DBUtil.getDataSource(conCfg);
         LOGGER.debug("ds=" + ds);
+    }
+
+    /**
+     * Returns DN of a cadc user
+     *
+     * @param userId The HTTP Principal to get the DN for.
+     * @return X500Principal, or null.
+     */
+    @Override
+    protected X500Principal getCertificateDN(HttpPrincipal userId)
+    {
+        final JdbcTemplate jdbc = new JdbcTemplate(ds);
+
+        @SuppressWarnings("unchecked")
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT " ).append(database).append(".dbo.genDN(?)");
+        String sql = sb.toString();
+        LOGGER.debug("getCertificateDN: " + sql);
+        final String userDN = (String) jdbc.queryForObject(sql, new Object[]{ userId.getName()}, String.class);
+
+        X500Principal ret = null;
+        if (userDN != null)
+            ret = new X500Principal(userDN);
+        LOGGER.debug("getCertificateDN: " + userId + " -> " + ret);
+        return ret;
+    }
+
+    @Override
+    protected X500Principal[] getExpiring(int expire)
+    {
+        // @formatter:off
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT canon_dn" + " FROM ").append(database).append(".dbo.x509_certificates");
+        sb.append(" WHERE canon_dn like 'cn=%&____,ou=cadc,o=hia,c=ca' escape '&'");
+        sb.append(" AND datediff(dd, current_date(), exp_date) < ? ");
+        String query = sb.toString();
+        LOGGER.debug("getExpiringCADC: " + query);
+        
+        // @formatter:on
+        JdbcTemplate jdbc = new JdbcTemplate(ds);
+        @SuppressWarnings(value = "unchecked")
+        List<String> rsList = (List<String>) jdbc.queryForList(query, new Object[]{expire}, String.class);
+        X500Principal[] result = new X500Principal[rsList.size()];
+        Iterator<String> it = rsList.iterator();
+        for (int i = 0; i < result.length; i++)
+        {
+            result[i] = new X500Principal(it.next());
+        }
+        return result;
     }
 
 }
