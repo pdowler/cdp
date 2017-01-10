@@ -46,6 +46,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.log.WebServiceLogInfo;
+import ca.nrc.cadc.util.Log4jInit;
+import org.apache.log4j.Level;
 import org.bouncycastle.openssl.PEMWriter;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -59,6 +61,11 @@ import static org.easymock.EasyMock.*;
 public class ProxyServletTest
 {
 
+    static
+    {
+        Log4jInit.setLevel("ca.nrc.cadc.cdp.server", Level.INFO);
+    }
+    
     @Test
     public void testInit() throws Exception
     {
