@@ -78,16 +78,16 @@ import org.junit.Test;
  *
  * @author pdowler
  */
-public class CertifcateSchemaTest 
+public class CertificateSchemaTest 
 {
-    private static final Logger log = Logger.getLogger(CertifcateSchemaTest.class);
+    private static final Logger log = Logger.getLogger(CertificateSchemaTest.class);
 
     static
     {
         Log4jInit.setLevel("ca.nrc.cadc.cdp.server", Level.INFO);
     }
     
-    public CertifcateSchemaTest() { }
+    public CertificateSchemaTest() { }
     
     @Test
     public void testTableNameAll()
