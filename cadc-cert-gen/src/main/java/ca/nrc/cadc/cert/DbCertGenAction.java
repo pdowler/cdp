@@ -47,6 +47,7 @@ import ca.nrc.cadc.db.ConnectionConfig;
 import ca.nrc.cadc.db.DBConfig;
 import ca.nrc.cadc.db.DBUtil;
 import ca.nrc.cadc.util.ArgumentMap;
+import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
 
@@ -68,6 +69,11 @@ public abstract class DbCertGenAction extends AbstractCertGenAction
 
     //public static final String GENERATE_DN_Q = "select dbo.genDN(?)";
 
+    protected DbCertGenAction(URI serviceID)
+    {
+        super(serviceID);
+    }
+    
     @Override
     public boolean init(final ArgumentMap argMap) throws IOException
     {
