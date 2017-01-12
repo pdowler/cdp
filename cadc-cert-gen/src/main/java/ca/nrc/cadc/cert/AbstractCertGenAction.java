@@ -54,10 +54,14 @@ public abstract class AbstractCertGenAction implements PrivilegedAction<Object>
 {
     private static Logger LOGGER = Logger.getLogger(AbstractCertGenAction.class);
 
-    public static final URI CRED_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/cred");
-
     protected int expiring;
     protected String userid;
+    protected final URI serviceID;
+    
+    protected AbstractCertGenAction(URI serviceID)
+    {
+        this.serviceID = serviceID;
+    }
 
     public boolean init(final ArgumentMap argMap) throws IOException
     {

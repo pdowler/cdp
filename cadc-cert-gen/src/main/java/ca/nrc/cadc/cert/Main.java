@@ -41,9 +41,10 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 
 import ca.nrc.cadc.auth.CertCmdArgUtil;
-import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.ArgumentMap;
 import ca.nrc.cadc.util.LogArgUtil;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 /**
  * Main class for the CertGenerator Discovery Agent. The DA generates
@@ -66,6 +67,8 @@ public class Main
     public static final String ARG_EXPIRING = "expiring";
     public static final String ARG_USERID = "userid";
 
+    public static final String ARG_RESOUIRCE_ID = "resourceID";
+    
     public static final int STATUS_FAIL = 1; // exit code for failure
     public static final int STATUS_OK = 0; // exit code for successful execution
     protected static final int DEFAULT_EXPIRE = 30; // Default to 30 days
@@ -126,34 +129,38 @@ public class Main
             return STATUS_FAIL;
         }
 
-        String credHost = argMap.getValue("cred");
-        if (credHost != null)
-        {
-            System.setProperty(RegistryClient.class.getName() + ".host", credHost);
-            LOGGER.info("override cred service host: " + credHost);
-        }
-                
         CertGenAction command = null;
 
+        String rid = argMap.getValue(ARG_RESOUIRCE_ID);
+        if (rid == null)
+        {
+            usage();
+            LOGGER.error("missing required --" + ARG_RESOUIRCE_ID);
+            return STATUS_FAIL;
+        }
         try
         {
-            command = new CertGenAction();
+            URI resourceID = new URI(rid);
+            command = new CertGenAction(resourceID);
             if (!command.init(argMap))
             {
                 usage();
                 return STATUS_FAIL;
             }
         }
+        catch(URISyntaxException ex)
+        {
+            LOGGER.error("malformed resourceID: " + rid);
+            return STATUS_FAIL;
+        }
         catch (IOException e)
         {
-            msg("Cannot find .dbrc file to connect to the database");
-            msg("");
+            LOGGER.error("Cannot find .dbrc file to connect to the database");
             return STATUS_FAIL;
         }
         catch (IllegalArgumentException ex)
         {
-            msg("illegal argument(s): " + ex.getMessage());
-            msg("");
+            LOGGER.error("illegal argument(s): " + ex.getMessage());
             if (command != null)
             {
                 usage();
@@ -179,18 +186,6 @@ public class Main
     }
 
     /**
-     * Initializes of the base URL for the service
-     *
-     * @param argMap Parsed command arguments map.
-     */
-    static AbstractCertGenAction getCommand(final ArgumentMap argMap)
-            throws IllegalArgumentException, IOException
-    {
-        return new CertGenAction();
-    }
-
-
-    /**
      * Formats the usage message.
      */
     public static void usage()
@@ -199,7 +194,7 @@ public class Main
 
         String[] um = {
                 "",
-                "cadc-cert-gen [options] [--dryrun] --expiring=<numDays> --signingCert=<certfile.pem>",
+                "cadc-cert-gen [options] [--dryrun] --resourceID=<CDP service identifier> --expiring=<numDays> --signingCert=<certfile.pem>",
                 "    \"renew certificates that will expire within <numDays>\"",
                 "    --dryrun - only list the expiring certificates",
                 "",
@@ -209,14 +204,17 @@ public class Main
                 "    \"renew certificate for user with userid <userid>\"",
                 "",
                 "  WHERE",
+                "    --resourceID:  specifies the CDP service to use (e.g. ivo://cadc.nrc.ca/cred)",
                 "    --signingCert: PEM file containing certificate and key use to sign certificates",
                 "",
                 "  OPTIONS:",
                 "    --server=<server> (default is SYBASE)",
                 "    --database=<database> (default is archive)",
-                "    --cred=<CDP service host> (optional non-production service)",
-                "  IMPORTANT: the --server/--database must specify the back-end persistence used",
-                "             by the CDP service given by the --cred option",
+                "",
+                "  IMPORTANT: the --server/--database must specify the same back-end persistence used",
+                "             by the CDP service; the latter is controlled by setting the CADC_CERT_GEN_OPTS",
+                "             environment variable in order to subvert the cadc-registry client",
+                "",
                 "    -h --help: show help",
                 "    -v --verbose",
                 "    -d --debug",

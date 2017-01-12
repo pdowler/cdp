@@ -49,8 +49,6 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
-import java.util.Iterator;
-import java.util.List;
 import java.util.TimeZone;
 
 import javax.security.auth.x500.X500Principal;
@@ -71,6 +69,8 @@ import ca.nrc.cadc.cred.CertUtil;
 import ca.nrc.cadc.cred.client.CredClient;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.ArgumentMap;
+import java.net.URI;
+import java.security.spec.InvalidKeySpecException;
 
 /**
  * Generates a new certificate using CDP client API.
@@ -90,6 +90,11 @@ public class CertGenAction extends DbCertGenAction
     X509CertificateChain signer;
     boolean dryRun = true;
 
+    public CertGenAction(URI serviceID)
+    {
+        super(serviceID);
+    }
+    
     @Override
     public boolean init(final ArgumentMap argMap) throws IOException
     {
@@ -206,7 +211,7 @@ public class CertGenAction extends DbCertGenAction
 
         LOGGER.debug("Generate private key & CSR");
 
-        CredClient client = new CredClient(CRED_SERVICE_ID);
+        CredClient client = new CredClient(serviceID);
         try
         {
             client.deleteResource(userDN); // remove old CSR
