@@ -1,5 +1,6 @@
 package org.astrogrid.security.delegation;
 
+import ca.nrc.cadc.auth.X509CertificateChain;
 import java.io.IOException;
 import java.io.Writer;
 import java.security.GeneralSecurityException;
@@ -60,7 +61,7 @@ public abstract class Delegations
      */
     public String hash(X500Principal principal)
     {
-        return Integer.toString(principal.hashCode());
+        return X509CertificateChain.genHashKey(principal);
     }
 
     /**
@@ -69,7 +70,9 @@ public abstract class Delegations
      * a key pair and a CSR are generated and stored; the certificate
      * property is set to null.
      * 
+     * @param identity
      * @return The hash of the distinguished name.
+     * @throws java.security.GeneralSecurityException
      */
     public abstract String initializeIdentity(String identity)
             throws GeneralSecurityException;
@@ -83,9 +86,10 @@ public abstract class Delegations
      * @param principal
      *            The distinguished name on which to base the identity.
      * @return The hash key corresponding to the distinguished name.
+     * @throws java.security.GeneralSecurityException
      */
     public abstract String initializeIdentity(X500Principal principal)
-            throws GeneralSecurityException;
+        throws GeneralSecurityException;
 
     public abstract CertificateSigningRequest getCsr(String hashKey);
 
@@ -104,8 +108,12 @@ public abstract class Delegations
      * Stores a certificate for the given identity. Any previous
      * certificate is overwritten. This operation is thread-safe against
      * concurrent reading of the certificate.
+     * @param hashKey
+     * @param certificates
+     * @throws java.security.InvalidKeyException
      */
-    public abstract void setCertificates(String hashKey, X509Certificate[] certificates) throws InvalidKeyException;
+    public abstract void setCertificates(String hashKey, X509Certificate[] certificates) 
+        throws InvalidKeyException;
 
     public abstract Object[] getPrincipals();
 
@@ -125,6 +133,7 @@ public abstract class Delegations
      * 
      * @param hashKey
      *            The hash key identifying the user.
+     * @return 
      */
     public abstract boolean hasCertificate(String hashKey);
 
@@ -135,6 +144,7 @@ public abstract class Delegations
      *            The hash key identifying the user.
      * @param out
      *            The destination for the certificate.
+     * @throws java.io.IOException
      */
     public abstract void writeCertificate(String hashKey, Writer out)
             throws IOException;
