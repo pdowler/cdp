@@ -116,7 +116,8 @@ public class CadcDelegationServlet extends DelegationServlet
             String[] dns = suDNStr.split("\n");
             for (String dn : dns)
             {
-                X500Principal su = new X500Principal(dn);
+                String sp = dn.replaceAll("\"", "").trim();
+                X500Principal su = new X500Principal(sp);
                 suDNs.add(su);
                 LOGGER.info("SU: " + su.getName());
             }

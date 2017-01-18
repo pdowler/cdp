@@ -154,8 +154,8 @@ public class ProxyServlet extends HttpServlet
                 String principalStr = st.nextToken();
                 StringTokenizer st2 = new StringTokenizer(principalStr, ":",
                                                           false);
-                final String principal; // the principal of the trusted client
-                final Float maxDaysValid; // maximum lifetime of the returned proxy
+                String principal; // the principal of the trusted client
+                Float maxDaysValid; // maximum lifetime of the returned proxy
 
                 if (st2.countTokens() == 1)
                 {
@@ -179,10 +179,12 @@ public class ProxyServlet extends HttpServlet
                             "Cannot parse trusted principal from servlet " +
                             "config: " + principalStr);
                 }
-                LOGGER.info("trusted: " + principal + " , max days valid: "
-                            + maxDaysValid);
-                trustedPrincipals.put(new X500Principal(principal),
-                                      maxDaysValid);
+                if (principal != null)
+                {
+                    principal = principal.replaceAll("\"", "");
+                    LOGGER.info("trusted: " + principal + " , max days valid: " + maxDaysValid);
+                    trustedPrincipals.put(new X500Principal(principal), maxDaysValid);
+                }
             }
         }
         
