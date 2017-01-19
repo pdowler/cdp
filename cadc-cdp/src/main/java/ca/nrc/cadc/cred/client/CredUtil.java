@@ -84,6 +84,7 @@ import java.security.PrivilegedExceptionAction;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
+import java.util.Iterator;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 
@@ -196,7 +197,14 @@ public class CredUtil
                 }
 
                 privateKeyChain.getChain()[0].checkValidity();
-
+                // carefully remove the previous chain
+                Iterator iter = subject.getPublicCredentials().iterator();
+                while ( iter.hasNext() )
+                {
+                    Object o = iter.next();
+                    if (o instanceof X509CertificateChain)
+                        iter.remove();
+                }
                 subject.getPublicCredentials().add(privateKeyChain);
             }
         }

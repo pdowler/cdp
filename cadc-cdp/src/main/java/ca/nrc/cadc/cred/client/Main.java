@@ -229,7 +229,7 @@ public class Main implements PrivilegedAction<Boolean>
     {
         try
         {
-            client.delegate(null, daysValid);
+            client.delegate(daysValid);
             msg("Certificate updated");
         }
         catch (Exception e)
@@ -425,10 +425,10 @@ public class Main implements PrivilegedAction<Boolean>
     public static void usage()
     {
         String[] um = {
-                "Usage: java -jar cadcCDP.jar [-v|--verbose|-d|--debug] --resourceID=<CDP service to use> <op> ...",
+                "Usage: cadc-cdp [-v|--verbose|-d|--debug] --resourceID=<CDP service to use> <op> ...",
                 CertCmdArgUtil.getCertArgUsage(),
                 "",
-                "Help: java -jar cadcCDP.jar <-h | --help>",
+                "Help: cadc-cdp <-h|--help>",
                 "",
                 "  --resourceID specifies the CDP service to use (e.g. ivo://cadc.nrc.ca/cred)",
                 "",
@@ -439,7 +439,7 @@ public class Main implements PrivilegedAction<Boolean>
                 "  --get --userdn=<user distinguished name> [--out=<file>] [--daysValid=<days>] ",
                 "          get a new (shorter) proxy certificate from the server;",
                 "  --view",
-                "          view the currently deleagted proxy certificate",
+                "          view the currently delegated proxy certificate",
         };
 
         for (String line : um)
