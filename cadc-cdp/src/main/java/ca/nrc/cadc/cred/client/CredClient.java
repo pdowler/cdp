@@ -210,9 +210,37 @@ public class CredClient
     }
 
     /**
-     * Delegate credentials to the service (IVOA CDP-1.0).
+     * Delegate current subject credentials to the service (IVOA CDP-1.0).
      * 
-     * @param userDN
+     * @param days
+     * @throws MalformedURLException
+     * @throws IOException
+     * @throws InvalidKeyException
+     * @throws NoSuchProviderException
+     * @throws NoSuchAlgorithmException
+     * @throws SignatureException
+     * @throws CertificateEncodingException
+     * @throws CertificateParsingException
+     * @throws CertificateExpiredException
+     * @throws CertificateNotYetValidException 
+     * @throws ca.nrc.cadc.net.ResourceNotFoundException 
+     */
+    public void delegate(double days)
+            throws MalformedURLException, IOException,
+            InvalidKeyException, NoSuchProviderException,
+            NoSuchAlgorithmException, SignatureException,
+            CertificateEncodingException, CertificateParsingException,
+            CertificateExpiredException, CertificateNotYetValidException, ResourceNotFoundException
+    {
+        delegate(null, days);
+    }
+    
+    /**
+     * Custom delegation method that allows the caller to have a different DN from
+     * the created certificate DN. This feature allows the caller/signer to use the
+     * CDP service as a certificate authority (see: cadc-cert-gen).
+     * 
+     * @param userDN target DN to create; null for self-delegation
      * @param days
      * @throws MalformedURLException
      * @throws IOException
