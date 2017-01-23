@@ -223,10 +223,9 @@ public class CertificateDAO
 
     public X509CertificateChain get(X500Principal principal)
     {
-        if (principal == null) return null;
-        String canonizedDn = AuthenticationUtil.canonizeDistinguishedName(principal.getName());
-        X500Principal p = new X500Principal(canonizedDn);
-        String hashKey = Integer.toString(p.hashCode());
+        if (principal == null) 
+            return null;
+        String hashKey = X509CertificateChain.genHashKey(principal);
         return get(hashKey);
     }
 
