@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2011.                            (c) 2011.
+*  (c) 2017.                            (c) 2017.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -85,6 +85,9 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.util.Iterator;
+import javax.naming.InitialContext;
+import javax.naming.NameNotFoundException;
+import javax.naming.NamingException;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 
@@ -108,13 +111,55 @@ public class CredUtil
     private static final Logger log = Logger.getLogger(CredUtil.class);
     
     public static final double PROXY_CERT_DURATION = 0.1; // couple of hours
+    public static final String SERVOPS_JNDI_NAME = "servops-cert";
 
     private CredUtil() { }
     
     private static Subject createOpsSubject()
     {
+        // First check for a JNDI binding, then look on disk
+        Subject s = createServopsSubjectFromJNDI();
+        log.debug("servops subject from JNDI: " + s);
+        if (s != null)
+            return s;
+
+        s = createServopsSubjectFromFile();
+        log.debug("servops subject from disk: " + s);
+        if (s != null)
+            return s;
+
+        throw new IllegalStateException("servops.pem not found in JNDI or on disk.");
+    }
+
+    private static Subject createServopsSubjectFromJNDI()
+    {
+        try
+        {
+            InitialContext ic = new InitialContext();
+            Object entry = ic.lookup(SERVOPS_JNDI_NAME);
+            if (entry == null)
+                return null;
+            X509CertificateChain chain = (X509CertificateChain) entry;
+            return AuthenticationUtil.getSubject(chain);
+        }
+        catch (NameNotFoundException e)
+        {
+            return null;
+        }
+        catch (NamingException e)
+        {
+            log.warn("Unexpected JNDI exception.", e);
+            return null;
+        }
+    }
+
+    private static Subject createServopsSubjectFromFile()
+    {
         File pemFile = new File(System.getProperty("user.home") + "/.ssl/cadcproxy.pem");
-        return SSLUtil.createSubject(pemFile);
+        if (pemFile != null)
+            return SSLUtil.createSubject(pemFile);
+        else
+            return null;
     }
     
     /**
