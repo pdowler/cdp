@@ -72,6 +72,7 @@ package ca.nrc.cadc.cred.util;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.SSLUtil;
+import ca.nrc.cadc.auth.ServletPrincipalExtractor;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.log.ServletLogInfo;
@@ -89,6 +90,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.Principal;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -132,10 +134,10 @@ public class CredInjectionServlet extends HttpServlet
         log.info(logInfo.start());
         try
         {
-            Subject subject = AuthenticationUtil.getSubject(request);
-            log.debug("Subject: " + subject);
-            logInfo.setSubject(subject);
-            if (subject == null)
+            ServletPrincipalExtractor principalExtractor = new ServletPrincipalExtractor(request);
+            Set<Principal> principals = principalExtractor.getPrincipals();
+
+            if (principals == null || principals.size() == 0)
             {
                 // unauthorized request
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -144,24 +146,22 @@ public class CredInjectionServlet extends HttpServlet
 
             boolean isAuthorized = false;
 
-            Set<X500Principal> x500Principals = subject.getPrincipals(X500Principal.class);
-            Iterator<X500Principal> x500Iterator = x500Principals.iterator();
-            String nextDN = null;
-            while (x500Iterator.hasNext())
+            Iterator<Principal> i = principals.iterator();
+            while (i.hasNext())
             {
-                nextDN = AuthenticationUtil.canonizeDistinguishedName(x500Iterator.next().getName());
-                if (nextDN.equals(authorizedDN))
-                    isAuthorized = true;
-            }
-
-            Set<HttpPrincipal> httpPrincipals = subject.getPrincipals(HttpPrincipal.class);
-            Iterator<HttpPrincipal> httpIterator = httpPrincipals.iterator();
-            String nextUID = null;
-            while (httpIterator.hasNext())
-            {
-                nextUID = httpIterator.next().getName();
-                if (nextUID.equals(authorizedUID))
-                    isAuthorized = true;
+                Principal p = i.next();
+                if (p instanceof X500Principal)
+                {
+                    String dn = AuthenticationUtil.canonizeDistinguishedName(p.getName());
+                    if (dn.equals(authorizedDN))
+                        isAuthorized = true;
+                }
+                if (p instanceof HttpPrincipal)
+                {
+                    String uid = p.getName();
+                    if (uid.equals(authorizedUID))
+                        isAuthorized = true;
+                }
             }
 
             if (!isAuthorized)
