@@ -70,6 +70,7 @@
 package ca.nrc.cadc.cred.util;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.client.CredUtil;
@@ -105,16 +106,23 @@ public class CredInjectionServlet extends HttpServlet
 {
     private static final Logger log = Logger.getLogger(CredInjectionServlet.class);
     private static final String AUTHORIZED_DN = "authorized_dn";
+    private static final String AUTHORIZED_UID = "authorized_uid";
     private static final double MAX_CERT_SIZE_BYTES = Math.pow(2, 16);  // 64K
     private String authorizedDN;
+    private String authorizedUID;
 
     public void init(ServletConfig config) throws ServletException
     {
         authorizedDN = config.getInitParameter(AUTHORIZED_DN);
-        if (authorizedDN == null)
-            throw new ExceptionInInitializerError("No authorized users configured to inject credentials.");
+
         authorizedDN = authorizedDN.replace("\"", "");
         authorizedDN = AuthenticationUtil.canonizeDistinguishedName(authorizedDN);
+
+        authorizedUID = config.getInitParameter(AUTHORIZED_UID);
+        authorizedUID = authorizedUID.replace("\"", "");
+
+        if (authorizedDN == null && authorizedUID == null)
+            throw new ExceptionInInitializerError("No authorized users configured to inject credentials.");
     }
 
     public void doPut(HttpServletRequest request, HttpServletResponse response) throws ServletException
@@ -134,14 +142,25 @@ public class CredInjectionServlet extends HttpServlet
                 return;
             }
 
-            Set<X500Principal> x500Principals = subject.getPrincipals(X500Principal.class);
             boolean isAuthorized = false;
-            Iterator<X500Principal> i = x500Principals.iterator();
+
+            Set<X500Principal> x500Principals = subject.getPrincipals(X500Principal.class);
+            Iterator<X500Principal> x500Iterator = x500Principals.iterator();
             String nextDN = null;
-            while (i.hasNext())
+            while (x500Iterator.hasNext())
             {
-                nextDN = AuthenticationUtil.canonizeDistinguishedName(i.next().getName());
+                nextDN = AuthenticationUtil.canonizeDistinguishedName(x500Iterator.next().getName());
                 if (nextDN.equals(authorizedDN))
+                    isAuthorized = true;
+            }
+
+            Set<HttpPrincipal> httpPrincipals = subject.getPrincipals(HttpPrincipal.class);
+            Iterator<HttpPrincipal> httpIterator = httpPrincipals.iterator();
+            String nextUID = null;
+            while (httpIterator.hasNext())
+            {
+                nextUID = httpIterator.next().getName();
+                if (nextUID.equals(authorizedUID))
                     isAuthorized = true;
             }
 
