@@ -115,7 +115,7 @@ public class CredUtil
 
     private CredUtil() { }
     
-    private static Subject createOpsSubject()
+    public static Subject createOpsSubject()
     {
         // First check for a JNDI binding, then look on disk
         Subject s = createServopsSubjectFromJNDI();
