@@ -69,10 +69,10 @@
 
 package ca.nrc.cadc.cred.client;
 
-
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.SSLUtil;
+import ca.nrc.cadc.auth.SSOCookieCredential;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
@@ -85,6 +85,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.util.Iterator;
+import java.util.Set;
+
 import javax.naming.InitialContext;
 import javax.naming.NameNotFoundException;
 import javax.naming.NamingException;
@@ -92,31 +94,31 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 
 /**
- * Utility class to support a standard server-side use of the CredClient. Server-side
- * applications typically have to have valid credentials for the current user in order 
- * to call other services on the user's behalf. The methods here support the standard
- * usage as follows:
+ * Utility class to support a standard server-side use of the CredClient.
+ * Server-side applications typically have to have valid credentials for the
+ * current user in order to call other services on the user's behalf. The
+ * methods here support the standard usage as follows:
  * <ul>
  * <li>check Subject for a valid proxy certificate
  * <li>discard stored but invalid certificate
  * <li>load certificate for ops user from${user.home}/.ssl/cadcproxy.pem
- * <li>use CredClient as ops user to retrieve a new proxy certificate for the current user
+ * <li>use CredClient as ops user to retrieve a new proxy certificate for the
+ * current user
  * <li>store the user certificate in the Subject
  * </ul>
  * 
  * @author pdowler
  */
-public class CredUtil 
-{
+public class CredUtil {
     private static final Logger log = Logger.getLogger(CredUtil.class);
-    
+
     public static final double PROXY_CERT_DURATION = 0.1; // couple of hours
     public static final String SERVOPS_JNDI_NAME = "servops-cert";
 
-    private CredUtil() { }
-    
-    public static Subject createOpsSubject()
-    {
+    private CredUtil() {
+    }
+
+    public static Subject createOpsSubject() {
         // First check for a JNDI binding, then look on disk
         Subject s = createServopsSubjectFromJNDI();
         log.debug("servops subject from JNDI: " + s);
@@ -131,37 +133,27 @@ public class CredUtil
         throw new IllegalStateException("servops.pem not found in JNDI or on disk.");
     }
 
-    private static Subject createServopsSubjectFromJNDI()
-    {
-        try
-        {
+    private static Subject createServopsSubjectFromJNDI() {
+        try {
             InitialContext ic = new InitialContext();
             Object entry = ic.lookup(SERVOPS_JNDI_NAME);
             if (entry == null)
                 return null;
             X509CertificateChain chain = (X509CertificateChain) entry;
             return AuthenticationUtil.getSubject(chain);
-        }
-        catch (NameNotFoundException e)
-        {
+        } catch (NameNotFoundException e) {
             return null;
-        }
-        catch (NamingException e)
-        {
+        } catch (NamingException e) {
             log.warn("Unexpected JNDI exception.", e);
             return null;
         }
     }
 
-    private static Subject createServopsSubjectFromFile()
-    {
+    private static Subject createServopsSubjectFromFile() {
         File pemFile = new File(System.getProperty("user.home") + "/.ssl/cadcproxy.pem");
-        if (pemFile != null)
-            return SSLUtil.createSubject(pemFile);
-        else
-            return null;
+        return SSLUtil.createSubject(pemFile);
     }
-    
+
     /**
      * Check if the current subject has usable credentials (a valid X509 proxy
      * certificate) and call the local CDP service if necessary.
@@ -172,18 +164,15 @@ public class CredUtil
      * @throws java.security.cert.CertificateNotYetValidException
      */
     public static boolean checkCredentials()
-        throws AccessControlException,  CertificateExpiredException, CertificateNotYetValidException
-    {
+            throws AccessControlException, CertificateExpiredException, CertificateNotYetValidException {
         return checkCredentials(AuthenticationUtil.getCurrentSubject());
     }
-    
-    
 
     /**
      * Check if the specified subject has usable credentials (a valid X509 proxy
      * certificate) and call the local CDP service if necessary. This method uses
      * the <code>ca.nrc.cadc.reg.client.LocalAuthority</code> class to find the
-     * local CDP service. Thus, this usage only makes sense in server-side 
+     * local CDP service. Thus, this usage only makes sense in server-side
      * applications.
      * 
      * @param subject
@@ -192,68 +181,66 @@ public class CredUtil
      * @throws java.security.cert.CertificateNotYetValidException
      */
     public static boolean checkCredentials(final Subject subject)
-        throws AccessControlException, CertificateExpiredException, CertificateNotYetValidException
-    {
+            throws AccessControlException, CertificateExpiredException, CertificateNotYetValidException {
         AuthMethod am = AuthenticationUtil.getAuthMethod(subject);
-        if (am == null || AuthMethod.ANON.equals(am))
+        if (am == null || AuthMethod.ANON.equals(am)) {
             return false;
-        
-        try
-        {
-            X509CertificateChain privateKeyChain = X509CertificateChain.findPrivateKeyChain(
-                    subject.getPublicCredentials());
+        }
 
-            if (privateKeyChain != null)
-            {
-                try
-                {
+        // first see if there are valid cookie credentials
+        Set<SSOCookieCredential> cookieCreds = subject.getPublicCredentials(SSOCookieCredential.class);
+        for (SSOCookieCredential nextCookie : cookieCreds) {
+            log.debug("Checking cookie credential: " + nextCookie);
+            if (!nextCookie.isExpired()) {
+                return true;
+            }
+        }
+
+        // next see if there is a valid certificate chain. get one from cdp
+        // if there isn't
+        try {
+            X509CertificateChain privateKeyChain = X509CertificateChain
+                    .findPrivateKeyChain(subject.getPublicCredentials());
+
+            if (privateKeyChain != null) {
+                try {
                     privateKeyChain.getChain()[0].checkValidity();
-                }
-                catch(CertificateException ex)
-                {
+                } catch (CertificateException ex) {
                     privateKeyChain = null; // get new one below
                 }
             }
-            
-            if (privateKeyChain == null)
-            {
+
+            if (privateKeyChain == null) {
                 LocalAuthority loc = new LocalAuthority();
                 URI credURI = loc.getServiceURI(Standards.CRED_PROXY_10.toASCIIString());
                 final CredClient cred = new CredClient(credURI);
                 Subject opsSubject = createOpsSubject();
-                try
-                {
-                    privateKeyChain = Subject.doAs(opsSubject, new PrivilegedExceptionAction<X509CertificateChain>()
-                    {
-                        public X509CertificateChain run() throws Exception
-                        {
+                try {
+                    privateKeyChain = Subject.doAs(opsSubject, new PrivilegedExceptionAction<X509CertificateChain>() {
+                        public X509CertificateChain run() throws Exception {
                             return cred.getProxyCertificate(subject, PROXY_CERT_DURATION);
                         }
                     });
-                }
-                catch(PrivilegedActionException ex)
-                {
+                } catch (PrivilegedActionException ex) {
                     throw new RuntimeException("CredClient.getProxyCertficate failed", ex.getException());
                 }
-                
-                if (privateKeyChain == null)
-                {
+
+                if (privateKeyChain == null) {
                     throw new AccessControlException("credential service did not return a delegated certificate");
                 }
 
                 privateKeyChain.getChain()[0].checkValidity();
                 // carefully remove the previous chain
                 Iterator iter = subject.getPublicCredentials().iterator();
-                while ( iter.hasNext() )
-                {
+                while (iter.hasNext()) {
                     Object o = iter.next();
                     if (o instanceof X509CertificateChain)
                         iter.remove();
                 }
                 subject.getPublicCredentials().add(privateKeyChain);
             }
+        } finally {
         }
-        finally { }
         return true;
     }
 }
