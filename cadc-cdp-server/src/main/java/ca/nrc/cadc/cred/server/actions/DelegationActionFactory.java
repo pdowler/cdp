@@ -71,6 +71,7 @@ package ca.nrc.cadc.cred.server.actions;
 
 import ca.nrc.cadc.auth.*;
 
+import java.util.List;
 import java.util.Map;
 
 import javax.security.auth.x500.X500Principal;
@@ -229,8 +230,7 @@ public class DelegationActionFactory
              * @return
              */
             @Override
-            public SSOCookieCredential getSSOCookieCredential()
-            {
+            public List<SSOCookieCredential> getSSOCookieCredentials() {
                 return null;
             }
         });
