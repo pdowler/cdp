@@ -82,14 +82,6 @@ import ca.nrc.cadc.profiler.Profiler;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Base64;
-import org.apache.log4j.Logger;
-import org.bouncycastle.jce.PKCS10CertificationRequest;
-import org.bouncycastle.openssl.PEMWriter;
-
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLSocketFactory;
-import javax.security.auth.Subject;
-import javax.security.auth.x500.X500Principal;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -121,14 +113,18 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.Set;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
+import javax.security.auth.Subject;
+import javax.security.auth.x500.X500Principal;
+import org.apache.log4j.Logger;
+import org.bouncycastle.jce.PKCS10CertificationRequest;
+import org.bouncycastle.openssl.PEMWriter;
 
 public class CredClient
 {
     private static Logger LOGGER = Logger.getLogger(CredClient.class);
     
-    // socket factory to use when connecting
-    SSLSocketFactory sf;
-
     private URI serviceID;
     
     public CredClient(URI serviceID)
@@ -843,19 +839,13 @@ public class CredClient
         if (!url.getProtocol().equals("https"))
         {
             throw new IllegalArgumentException("Wrong protocol: "
-                    + url.getProtocol() + ". GMS works on https only");
+                    + url.getProtocol() + ". CDP works on https only");
         }
-        if (sf == null)
-        {
-            // lazy initialization of socket factory
-            AccessControlContext ac = AccessController.getContext();
-            Subject subject = Subject.getSubject(ac);
-            sf = SSLUtil.getSocketFactory(subject);
-        }
-        HttpsURLConnection con = (HttpsURLConnection) url
-                .openConnection();
-        if (sf != null)
-            con.setSSLSocketFactory(sf);
+        AccessControlContext ac = AccessController.getContext();
+        Subject subject = Subject.getSubject(ac);
+        SSLSocketFactory sf = SSLUtil.getSocketFactory(subject);
+        HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
+        con.setSSLSocketFactory(sf);
         return con;
     }
 
