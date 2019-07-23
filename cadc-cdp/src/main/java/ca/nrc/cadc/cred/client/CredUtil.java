@@ -84,6 +84,7 @@ import java.security.PrivilegedExceptionAction;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -119,16 +120,22 @@ public class CredUtil {
     }
 
     public static Subject createOpsSubject() {
-        // First check for a JNDI binding, then look on disk
         Subject s = createServopsSubjectFromJNDI();
         log.debug("servops subject from JNDI: " + s);
-        if (s != null)
+        if (s == null) {
+            s = createServopsSubjectFromFile();
+            log.debug("servops subject from disk: " + s);
+        }
+        
+        if (s != null) {
+            X509CertificateChain ops = X509CertificateChain.findPrivateKeyChain(s.getPublicCredentials());
+            try {
+                ops.getChain()[0].checkValidity();
+            } catch (Exception ex) {
+                throw new RuntimeException("CONFIG: servops certificate is invalid", ex);
+            }
             return s;
-
-        s = createServopsSubjectFromFile();
-        log.debug("servops subject from disk: " + s);
-        if (s != null)
-            return s;
+        }
 
         throw new IllegalStateException("servops.pem not found in JNDI or on disk.");
     }
@@ -158,8 +165,8 @@ public class CredUtil {
      * Check if the current subject has usable credentials (a valid X509 proxy
      * certificate) and call the local CDP service if necessary.
      * 
-     * @throws AccessControlException
      * @return true if subject has valid credentials, false if subject is anonymous
+     * @throws AccessControlException
      * @throws java.security.cert.CertificateExpiredException
      * @throws java.security.cert.CertificateNotYetValidException
      */
@@ -175,7 +182,7 @@ public class CredUtil {
      * local CDP service. Thus, this usage only makes sense in server-side
      * applications.
      * 
-     * @param subject
+     * @param subject the subject to check
      * @return true if subject has valid credentials, false if subject is anonymous
      * @throws java.security.cert.CertificateExpiredException
      * @throws java.security.cert.CertificateNotYetValidException
