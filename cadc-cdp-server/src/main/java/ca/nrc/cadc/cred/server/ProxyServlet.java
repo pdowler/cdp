@@ -326,7 +326,7 @@ public class ProxyServlet extends HttpServlet
                          HttpServletResponse response)
         throws IOException
     {
-        WebServiceLogInfo logInfo = new ServletLogInfo(request);
+        WebServiceLogInfo logInfo = new ServletLogInfo(request, this.getServletName());
         LOGGER.info(logInfo.start());
         long start = System.currentTimeMillis();
         try
