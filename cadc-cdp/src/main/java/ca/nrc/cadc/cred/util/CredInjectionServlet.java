@@ -129,7 +129,7 @@ public class CredInjectionServlet extends HttpServlet
 
     public void doPut(HttpServletRequest request, HttpServletResponse response) throws ServletException
     {
-        ServletLogInfo logInfo = new ServletLogInfo(request, this.getServletName());
+        ServletLogInfo logInfo = new ServletLogInfo(request, this.getClass());
         long start = System.currentTimeMillis();
         log.info(logInfo.start());
         try
