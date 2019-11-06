@@ -138,7 +138,6 @@ public class CadcDelegationServlet extends DelegationServlet
             final HttpServletResponse response) throws IOException
     {
         WebServiceLogInfo logInfo = new ServletLogInfo(request);
-        logInfo.setClass(this.getClass());
         LOGGER.info(logInfo.start());
         long start = System.currentTimeMillis();
         try
