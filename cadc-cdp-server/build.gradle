@@ -39,5 +39,5 @@ dependencies {
     testCompile 'org.easymock:easymock:3.+'
 
     intTestRuntime 'net.sourceforge.jtds:jtds:1.+'
-
+    intTestRuntime 'org.postgresql:postgresql:[42.2.8,)'
 }
