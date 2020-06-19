@@ -102,7 +102,11 @@ public class CertificateDAOTest {
             ConnectionConfig cc = dbrc.getConnectionConfig("CRED_TEST", "cadctest");
             DBUtil.createJNDIDataSource("jdbc/CertificateDAOTest", cc);
 
-            CertificateDAO.CertificateSchema config = new CertificateDAO.CertificateSchema("jdbc/CertificateDAOTest", null, "cred");
+            String user = System.getProperty("user.name");
+            CertificateDAO.CertificateSchema config = new CertificateDAO.CertificateSchema("jdbc/CertificateDAOTest", 
+                null, "cred"); // PG
+            //    "cadctest", user); // SYB: also disable init_cleanup
+            
             this.dao = new CertificateDAO(config);
             
         } catch (Exception ex) {
@@ -140,7 +144,10 @@ public class CertificateDAOTest {
         try {
             File pemFile = FileUtil.getFileFromResource("cdp-test.pem", CertificateDAOTest.class);
             X509CertificateChain cc1 = SSLUtil.readPemCertificateAndKey(pemFile);
-            
+           
+            // delete
+            dao.delete(cc1.getHashKey());
+
             // not found
             X509CertificateChain nf = dao.get(cc1.getHashKey());
             Assert.assertNull(nf);
