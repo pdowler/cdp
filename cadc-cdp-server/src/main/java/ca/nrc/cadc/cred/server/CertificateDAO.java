@@ -271,8 +271,8 @@ public class CertificateDAO {
         profiler.checkpoint("delete");
     }
 
-    // used by intTest
-    boolean exists(String hashKey) {
+    // used by intTest and AvailabilityPlugin(s)
+    public boolean exists(String hashKey) {
         RowMapper rowMapper = new SingleColumnRowMapper(String.class);
         String sql = "select canon_dn from " +tableName + " where hash_dn = ? ";
         log.debug("exists: " + sql);

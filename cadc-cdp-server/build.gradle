@@ -37,4 +37,6 @@ dependencies {
 
     testCompile 'junit:junit:4.+'
     testCompile 'org.easymock:easymock:3.+'
+    
+    intTestRuntime 'org.postgresql:postgresql:[42.2.8,)'
 }
