@@ -37,4 +37,7 @@ dependencies {
 
     testCompile 'junit:junit:4.+'
     testCompile 'org.easymock:easymock:3.+'
+
+    intTestRuntime 'net.sourceforge.jtds:jtds:1.+'
+
 }
