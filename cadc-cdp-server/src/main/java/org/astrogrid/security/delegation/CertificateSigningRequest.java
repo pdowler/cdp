@@ -27,10 +27,10 @@ public class CertificateSigningRequest extends PKCS10CertificationRequest {
   /**
    * Constructs a CertificateSigningRequest.
    * The subject is taken in as a plain string. The signing
-   * algorithm is fixed as MD5 digest, RSA encryption. This means that the
+   * algorithm is fixed as SHA256 digest, RSA encryption. This means that the
    * key-pair passed in must be RSA keys.
    *
-   * @throws NoSuchAlgorithmException If the JCE-provider doesn't know MD5WITHRSA.
+   * @throws NoSuchAlgorithmException If the JCE-provider doesn't know SHA256WITHRSA.
    * @throws NoSuchProviderException If the JCE-provider "BC" isn't registered.
    * @throws InvalidKeyException If the given keys are not RSA keys.
    */
