@@ -34,24 +34,23 @@
 
 package ca.nrc.cadc.cert;
 
-import java.io.IOException;
-
-import javax.security.auth.x500.X500Principal;
-import javax.sql.DataSource;
-
-import org.apache.log4j.Logger;
-import org.springframework.jdbc.core.JdbcTemplate;
-
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.db.ConnectionConfig;
 import ca.nrc.cadc.db.DBConfig;
 import ca.nrc.cadc.db.DBUtil;
 import ca.nrc.cadc.util.ArgumentMap;
+import java.io.IOException;
 import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
+import javax.security.auth.x500.X500Principal;
+import javax.sql.DataSource;
+import org.apache.log4j.Logger;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
+ * Horrible hacks to access database outside CertificateDAO that only works at CADC.
+ * TODO: fix this so it is actually testable and usable.
  * 
  * @author pdowler
  */
@@ -152,7 +151,7 @@ public abstract class DbCertGenAction extends AbstractCertGenAction
     {
         // @formatter:off
         StringBuilder sb = new StringBuilder();
-        sb.append("SELECT canon_dn" + " FROM ").append(database).append(".dbo.x509_certificates");
+        sb.append("SELECT canon_dn" + " FROM ").append(database).append(".dbo.X509CertificateChain");
         sb.append(" WHERE canon_dn like 'cn=%&____,ou=cadc,o=hia,c=ca' escape '&'");
         sb.append(" AND datediff(dd, current_date(), exp_date) < ? ");
         String query = sb.toString();
