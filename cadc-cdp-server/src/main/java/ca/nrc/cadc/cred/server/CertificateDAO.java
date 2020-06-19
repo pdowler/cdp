@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2011.                            (c) 2011.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -65,129 +65,106 @@
 *  $Revision: 5 $
 *
 ************************************************************************
-*/
+ */
 
 package ca.nrc.cadc.cred.server;
-
-import java.security.PrivateKey;
-import java.security.cert.X509Certificate;
-import java.sql.Types;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-
-import javax.security.auth.x500.X500Principal;
-import javax.sql.DataSource;
-
-import org.apache.log4j.Logger;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.SingleColumnRowMapper;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
+import ca.nrc.cadc.date.DateUtil;
 import ca.nrc.cadc.db.DBUtil;
 import ca.nrc.cadc.profiler.Profiler;
-import ca.nrc.cadc.vosi.avail.CheckDataSource;
-import ca.nrc.cadc.vosi.avail.CheckResource;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import javax.naming.NamingException;
+import javax.security.auth.x500.X500Principal;
+import javax.sql.DataSource;
+import org.apache.log4j.Logger;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.SingleColumnRowMapper;
 
 /**
- * Class to persist certificates in a relational database table. This class has 
+ * Class to persist certificates in a relational database table. This class has
  * been only tested with Sybase ASE 15 so far.
- * 
+ *
  * @author pdowler
  *
  */
-public class CertificateDAO
-{
-    private static final Logger logger = Logger.getLogger(CertificateDAO.class);
+public class CertificateDAO {
+    private static final Logger log = Logger.getLogger(CertificateDAO.class);
 
-    private final CertificateSchema config;
+    private final String tableName;
+    private final DataSource dataSource;
 
-    public static class CertificateSchema
-    {
+    public static class CertificateSchema {
+
         private final String dataSourceName;
-        public static String DEFAULT_CERT_TABLE = "x509_certificates";
-
         private final String certTable;
-        
-        /**
-         * Backwards compatible constructor with default table name.
-         * 
-         * @param dataSourceName
-         * @param catalog
-         * @param schema 
-         */
-        public CertificateSchema(String dataSourceName, String catalog, String schema)
-        {
-            this(dataSourceName, catalog, schema, DEFAULT_CERT_TABLE);
-        }
+
         /**
          * Constructor for certificate table description. The catalog and schema are optional
-         * (null values are allowed). 
-         * 
+         * (null values are allowed).
+         *
          * @param dataSourceName JNDI DataSource name
          * @param catalog optional catalog (database) name
          * @param schema optional schema name
          * @param table certificate table name (required)
          */
-        public CertificateSchema(String dataSourceName, String catalog, String schema, String table)
-        {
+        public CertificateSchema(String dataSourceName, String catalog, String schema) {
             this.dataSourceName = dataSourceName;
-            if (table == null)
-                throw new IllegalArgumentException("table name cannot be null");
-            
+
             StringBuilder sb = new StringBuilder();
-            if (catalog != null)
+            if (catalog != null) {
                 sb.append(catalog).append(".");
-            if (schema != null)
+            }
+            if (schema != null) {
                 sb.append(schema);
-            if (sb.length() > 0)
+            }
+            if (sb.length() > 0) {
                 sb.append("."); // yeah: double dot if catalog!= null and schema==null
-            sb.append(table);
+            }
+            sb.append(X509CertificateChain.class.getSimpleName());
             this.certTable = sb.toString();
         }
-        
-        public String getTable()
-        {
+
+        public String getTable() {
             return certTable;
         }
 
-        public DataSource getDataSource()
-        {
-            try
-            {
-                logger.debug("lookup datasource: " + dataSourceName);
-                return DBUtil.getDataSource(dataSourceName);
-            }
-            catch(NamingException ex)
-            {
-                throw new RuntimeException("CONFIG: failed to find DataSource " + dataSourceName);
-            }
-        }
         
     }
-    public CertificateDAO(CertificateSchema config)
-    {
-        this.config = config;
-    }
-    
-    public CheckResource getCheckResource()
-    {
-        String sql = "select top 1 hash_dn from " + config.getTable();
-        return new CheckDataSource(config.getDataSource(), sql);
+
+    public CertificateDAO(CertificateSchema config) {
+        this.tableName = config.certTable;
+        try {
+            log.debug("lookup datasource: " + config.dataSourceName);
+            this.dataSource = DBUtil.findJNDIDataSource(config.dataSourceName);
+        } catch (NamingException ex) {
+            throw new RuntimeException("CONFIG: failed to find DataSource " + config.dataSourceName);
+        }
     }
 
-    public void put(X509CertificateChain chain)
-    {
+    // needed by intTest
+    DataSource getDataSource() {
+        return dataSource;
+    }
+    
+    public void put(X509CertificateChain chain) {
         Profiler profiler = new Profiler(this.getClass());
         String hashKey = chain.getHashKey();
         String canonDn = AuthenticationUtil.canonizeDistinguishedName(chain.getPrincipal().getName());
@@ -195,77 +172,70 @@ public class CertificateDAO
         String certChainStr = chain.certificateString();
         byte[] bytesPrivateKey = chain.getPrivateKey().getEncoded();
         //TODO just for testing - padded with zeros
-        byte[] testBytesPrivateKey = Arrays.copyOf(bytesPrivateKey, bytesPrivateKey.length+1);
-        testBytesPrivateKey[testBytesPrivateKey.length-1]=1;
+        byte[] testBytesPrivateKey = Arrays.copyOf(bytesPrivateKey, bytesPrivateKey.length + 1);
+        testBytesPrivateKey[testBytesPrivateKey.length - 1] = 1;
         String csr = chain.getCsrString();
-        
-        JdbcTemplate jdbc = new JdbcTemplate(config.getDataSource());
-        if (recordExists(hashKey))
-        {
-            String sql = "update " + config.getTable()
-                    + " set canon_dn = ?, exp_date = ?, cert_chain = ?, private_key = ?, csr = ? where hash_dn=?";
-            Object[] args = new Object[] { canonDn, expDate, certChainStr, testBytesPrivateKey, csr, hashKey };
-            int[] argTypes = new int[] { Types.VARCHAR, Types.TIMESTAMP, Types.VARCHAR, Types.VARBINARY, Types.VARCHAR, Types.VARCHAR };
-            jdbc.update(sql, args, argTypes);
-        }
-        else
-        {
-            String sql = "insert into " + config.getTable()
-                + " (canon_dn, exp_date, cert_chain, private_key, csr, hash_dn) values (?,?,?,?,?,?)";
-            Object[] args = new Object[] { canonDn, expDate, certChainStr, testBytesPrivateKey, csr, hashKey };
-            int[] argTypes = 
-                new int[] { Types.VARCHAR, Types.TIMESTAMP, Types.VARCHAR, Types.VARBINARY, Types.VARCHAR, Types.VARCHAR };
 
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        Date now = new Date(); // TODO: should get from the database
+        if (exists(hashKey)) {
+            String sql = "update " + tableName
+                    + " set canon_dn = ?, exp_date = ?, cert_chain = ?, private_key = ?, csr = ?, lastModified = ? where hash_dn=?";
+            Object[] args = new Object[]{canonDn, expDate, certChainStr, testBytesPrivateKey, csr, now, hashKey};
+            int[] argTypes = new int[]{Types.VARCHAR, Types.TIMESTAMP, Types.VARCHAR, Types.VARBINARY, Types.VARCHAR, Types.TIMESTAMP, Types.VARCHAR};
+            log.debug("put: " + sql);
+            jdbc.update(sql, args, argTypes);
+        } else {
+            String sql = "insert into " + tableName
+                    + " (canon_dn, exp_date, cert_chain, private_key, csr, hash_dn, lastModified) values (?,?,?,?,?,?,?)";
+            Object[] args = new Object[]{canonDn, expDate, certChainStr, testBytesPrivateKey, csr, hashKey, now};
+            int[] argTypes
+                    = new int[]{Types.VARCHAR, Types.TIMESTAMP, Types.VARCHAR, Types.VARBINARY, Types.VARCHAR, Types.VARCHAR, Types.TIMESTAMP};
+            log.debug("put: " + sql);
             jdbc.update(sql, args, argTypes);
         }
         profiler.checkpoint("put");
     }
-
-    public X509CertificateChain get(X500Principal principal)
-    {
-        if (principal == null) 
+    
+    public X509CertificateChain get(X500Principal principal) {
+        if (principal == null) {
             return null;
+        }
         String hashKey = X509CertificateChain.genHashKey(principal);
         return get(hashKey);
     }
 
-    public X509CertificateChain get(String hashKey)
-    {
+    public X509CertificateChain get(String hashKey) {
         Profiler profiler = new Profiler(this.getClass());
         X509CertificateChain x509CertificateChain = null;
 
-        String query = "select canon_dn, exp_date, cert_chain, private_key, csr from " + config.getTable() + " where hash_dn = ? ";
-
-        
-        try
-        {
-            JdbcTemplate jdbc = new JdbcTemplate(config.getDataSource());
-            Map<String, Object> map = jdbc.queryForMap(query, new String[] { hashKey });
+        String sql = "select canon_dn, exp_date, cert_chain, private_key, csr from " + tableName + " where hash_dn = ? ";
+        log.debug("get: " + sql);
+        try {
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+            Map<String, Object> map = jdbc.queryForMap(sql, new String[]{hashKey});
             String canonDn = (String) map.get("canon_dn");
             Date expDate = (Date) map.get("exp_date");
             String certChainStr = (String) map.get("cert_chain");
             byte[] bytesPrivateKey = (byte[]) map.get("private_key");
-            
+
             // Sybase trims the trailing 0's of a varbinary. To compensate we add 0's to the 
             // privateKey byte array. Extra bytes in the private key array are ignored
             // when the key is built so the added 0's are only used when needed.
             // ad 20/07/2011
-            bytesPrivateKey = Arrays.copyOf(bytesPrivateKey, bytesPrivateKey.length+10);
-            
+            bytesPrivateKey = Arrays.copyOf(bytesPrivateKey, bytesPrivateKey.length + 10);
+
             String csrStr = (String) map.get("csr");
 
             PrivateKey privateKey = SSLUtil.readPrivateKey(bytesPrivateKey);
             X500Principal principal = new X500Principal(canonDn);
 
-            if (certChainStr != null)
-            {
+            if (certChainStr != null) {
                 byte[] bytesCertChain = certChainStr.getBytes();
                 X509Certificate[] certs = SSLUtil.readCertificateChain(bytesCertChain);
 
                 x509CertificateChain = new X509CertificateChain(Arrays.asList(certs));
-            }
-            else
-            {
+            } else {
                 x509CertificateChain = new X509CertificateChain(principal, privateKey, csrStr);
             }
             x509CertificateChain.setCsrString(csrStr);
@@ -273,26 +243,16 @@ public class CertificateDAO
             x509CertificateChain.setHashKey(hashKey);
             x509CertificateChain.setKey(privateKey);
             x509CertificateChain.setPrincipal(principal);
-        }
-        catch (EmptyResultDataAccessException e)
-        {
+        } catch (EmptyResultDataAccessException e) {
             // Record not exists.
             return null;
-        }
-        catch(InvalidKeySpecException ex)
-        {
+        } catch (InvalidKeySpecException ex) {
             throw new RuntimeException("BUG: failed to read private key", ex);
-        }
-        catch(NoSuchAlgorithmException ex)
-        {
+        } catch (NoSuchAlgorithmException ex) {
             throw new RuntimeException("BUG: failed to read private key", ex);
-        }
-        catch(CertificateException ex)
-        {
+        } catch (CertificateException ex) {
             throw new RuntimeException("BUG: failed to read certficate chain", ex);
-        }
-        catch(IOException ex)
-        {
+        } catch (IOException ex) {
             throw new RuntimeException("BUG: failed to read certificate chain", ex);
         }
         profiler.checkpoint("get");
@@ -302,34 +262,33 @@ public class CertificateDAO
     /* (non-Javadoc)
      * @see ca.nrc.cadc.accesscontrol.dao.CertificateDAO#delete(java.lang.String)
      */
-    public void delete(String hashKey)
-    {
+    public void delete(String hashKey) {
         Profiler profiler = new Profiler(this.getClass());
-        String sql = "delete from " + config.getTable() + " where hash_dn = ? ";
-        JdbcTemplate jdbc = new JdbcTemplate(config.getDataSource());
-        jdbc.update(sql, new String[] { hashKey });
+        String sql = "delete from " + tableName + " where hash_dn = ? ";
+        log.debug("delete: " + sql);
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.update(sql, new String[]{hashKey});
         profiler.checkpoint("delete");
     }
 
-    private boolean recordExists(String hashKey)
-    {
+    // used by intTest
+    boolean exists(String hashKey) {
         RowMapper rowMapper = new SingleColumnRowMapper(String.class);
-        String query = "select canon_dn from " + config.getTable() + " where hash_dn = ? ";
-        JdbcTemplate jdbc = new JdbcTemplate(config.getDataSource());
-        List<String> dnList = jdbc.query(query, new String[] { hashKey }, rowMapper);
+        String sql = "select canon_dn from " +tableName + " where hash_dn = ? ";
+        log.debug("exists: " + sql);
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        List<String> dnList = jdbc.query(sql, new String[] { hashKey }, rowMapper);
         return (dnList != null && dnList.size() == 1);
     }
 
-    public List<String> getAllHashKeys()
-    {
+    public List<String> getAllHashKeys() {
         Profiler profiler = new Profiler(this.getClass());
-        String query = "select hash_dn from " + config.getTable();
+        String query = "select hash_dn from " + tableName;
         RowMapper rowMapper = new SingleColumnRowMapper(String.class);
-        JdbcTemplate jdbc = new JdbcTemplate(config.getDataSource());
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         List<String> hashKeyList = jdbc.query(query, rowMapper);
         profiler.checkpoint("getAllHashKeys");
         return hashKeyList;
     }
-
 
 }

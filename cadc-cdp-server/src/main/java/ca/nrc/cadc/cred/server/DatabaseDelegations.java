@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2009.                            (c) 2009.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -65,10 +65,13 @@
 *  $Revision: 4 $
 *
 ************************************************************************
-*/
+ */
 
 package ca.nrc.cadc.cred.server;
 
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.X509CertificateChain;
+import ca.nrc.cadc.cred.CertUtil;
 import java.io.IOException;
 import java.io.Writer;
 import java.security.AccessControlContext;
@@ -83,54 +86,43 @@ import java.security.PrivateKey;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Set;
-
 import javax.security.auth.Subject;
 import javax.security.auth.x500.X500Principal;
-
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMWriter;
-
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.X509CertificateChain;
-import ca.nrc.cadc.cred.CertUtil;
 import org.apache.log4j.Logger;
 import org.astrogrid.security.delegation.CertificateSigningRequest;
 import org.astrogrid.security.delegation.Delegations;
 import org.astrogrid.security.delegation.Util;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMWriter;
 
 /**
- * Implementation of the base Delegations that stores certificates in a 
+ * Implementation of the base Delegations that stores certificates in a
  * relational database.
- * 
+ *
  * @author pdowler
  */
-public class DatabaseDelegations extends Delegations
-{
+public class DatabaseDelegations extends Delegations {
+
     private static final Logger log = Logger.getLogger(DatabaseDelegations.class);
-    
+
     private CertificateDAO certificateDAO = null;
     private KeyPairGenerator keyPairGenerator;
-    
-    protected DatabaseDelegations(String dataSourceName, CertificateDAO.CertificateSchema config)
-    {
+
+    protected DatabaseDelegations(String dataSourceName, CertificateDAO.CertificateSchema config) {
         // Add the Bouncy Castle JCE provider. This allows the CSR
         // classes to work. The BC implementation of PKCS#10 depends on
         // the ciphers in the BC provider.
-        if (Security.getProvider("BC") == null)
-        {
+        if (Security.getProvider("BC") == null) {
             Security.addProvider(new BouncyCastleProvider());
         }
 
-        try
-        {
+        try {
             keyPairGenerator = KeyPairGenerator.getInstance("RSA");
             keyPairGenerator.initialize(CertUtil.DEFAULT_KEY_LENGTH);
-        }
-        catch (NoSuchAlgorithmException ex)
-        {
+        } catch (NoSuchAlgorithmException ex) {
             throw new RuntimeException("BUG/CONFIG: cannot load RSA key-pair generator", ex);
         }
-        
+
         certificateDAO = new CertificateDAO(config);
     }
 
@@ -138,21 +130,15 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#initializeIdentity(java.lang.String)
      */
     @Override
-    public String initializeIdentity(String identity) throws GeneralSecurityException
-    {
-        try
-        {
+    public String initializeIdentity(String identity) throws GeneralSecurityException {
+        try {
             String canonizedDn = AuthenticationUtil.canonizeDistinguishedName(identity);
             X500Principal p = new X500Principal(canonizedDn);
             return initializeIdentity(p);
-        }
-        catch(GeneralSecurityException gex)
-        {
+        } catch (GeneralSecurityException gex) {
             log.debug("initializeIdentity failed", gex);
             throw gex;
-        }
-        catch(RuntimeException t)
-        {
+        } catch (RuntimeException t) {
             log.debug("initializeIdentity failed", t);
             throw t;
         }
@@ -162,10 +148,8 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#initializeIdentity(javax.security.auth.x500.X500Principal)
      */
     @Override
-    public String initializeIdentity(X500Principal principal) throws GeneralSecurityException
-    {
-        try
-        {
+    public String initializeIdentity(X500Principal principal) throws GeneralSecurityException {
+        try {
             String canonizedDn = AuthenticationUtil.canonizeDistinguishedName(principal.getName());
             X500Principal p = new X500Principal(canonizedDn);
             String hashKey = hash(p);
@@ -178,14 +162,10 @@ public class DatabaseDelegations extends Delegations
 
             certificateDAO.put(chain);
             return hashKey;
-        }
-        catch(GeneralSecurityException gex)
-        {
+        } catch (GeneralSecurityException gex) {
             log.debug("initializeIdentity failed", gex);
             throw gex;
-        }
-        catch(RuntimeException t)
-        {
+        } catch (RuntimeException t) {
             log.debug("initializeIdentity failed", t);
             throw t;
         }
@@ -195,11 +175,9 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#getCsr(java.lang.String)
      */
     @Override
-    public CertificateSigningRequest getCsr(String hashKey)
-    {
+    public CertificateSigningRequest getCsr(String hashKey) {
         X509CertificateChain x509CertificateChain = certificateDAO.get(hashKey);
-        if (x509CertificateChain == null)
-        {
+        if (x509CertificateChain == null) {
             return null;
         }
         String csrString = x509CertificateChain.getCsrString();
@@ -211,11 +189,9 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#getPrivateKey(java.lang.String)
      */
     @Override
-    public PrivateKey getPrivateKey(String hashKey)
-    {
+    public PrivateKey getPrivateKey(String hashKey) {
         X509CertificateChain x509CertificateChain = certificateDAO.get(hashKey);
-        if (x509CertificateChain == null)
-        {
+        if (x509CertificateChain == null) {
             return null;
         }
         return x509CertificateChain.getPrivateKey();
@@ -225,11 +201,9 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#getCertificate(java.lang.String)
      */
     @Override
-    public X509Certificate[] getCertificates(String hashKey)
-    {
+    public X509Certificate[] getCertificates(String hashKey) {
         X509CertificateChain x509CertificateChain = certificateDAO.get(hashKey);
-        if (x509CertificateChain == null)
-        {
+        if (x509CertificateChain == null) {
             return null;
         }
         return x509CertificateChain.getChain();
@@ -239,8 +213,7 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#remove(java.lang.String)
      */
     @Override
-    public void remove(String hashKey)
-    {
+    public void remove(String hashKey) {
         certificateDAO.delete(hashKey);
     }
 
@@ -248,8 +221,7 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#isKnown(java.lang.String)
      */
     @Override
-    public boolean isKnown(String hashKey)
-    {
+    public boolean isKnown(String hashKey) {
         X509CertificateChain chain = certificateDAO.get(hashKey);
         return (chain != null);
     }
@@ -258,24 +230,21 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#setCertificate(java.lang.String, java.security.cert.X509Certificate)
      */
     @Override
-    public void setCertificates(String hashKey, X509Certificate[] certificates) throws InvalidKeyException
-    {
+    public void setCertificates(String hashKey, X509Certificate[] certificates) throws InvalidKeyException {
         X509CertificateChain chain = certificateDAO.get(hashKey);
-        if (chain != null)
-        {
+        if (chain != null) {
             chain.setChain(certificates);
             certificateDAO.put(chain);
-        }
-        else
+        } else {
             throw new InvalidKeyException("No identity matches the hash key " + hashKey);
+        }
     }
 
     /* (non-Javadoc)
      * @see org.astrogrid.security.delegation.Delegations#getPrincipals()
      */
     @Override
-    public Object[] getPrincipals()
-    {
+    public Object[] getPrincipals() {
 //        List<String> hashKeyList = certificateDAO.getAllHashKeys();
 //        return hashKeyList.toArray();
         //TODO AD: this is a workaround to send the hash to the caller when it
@@ -284,29 +253,24 @@ public class DatabaseDelegations extends Delegations
         Subject subject = Subject.getSubject(acContext);
         Set<X500Principal> principals = subject
                 .getPrincipals(X500Principal.class);
-        if (principals.size() == 0)
-        {
+        if (principals.size() == 0) {
             throw new AccessControlException(
                     "Delegation failed because the caller is not authenticated.");
-        }
-        else if (principals.size() > 1)
-        {
+        } else if (principals.size() > 1) {
             throw new AccessControlException(
                     "Delegation failed because caller autheticated with multiple certificates.");
         }
-        return new String[] { X509CertificateChain.genHashKey(principals
-                .iterator().next()) };
+        return new String[]{X509CertificateChain.genHashKey(principals
+            .iterator().next())};
     }
 
     /* (non-Javadoc)
      * @see org.astrogrid.security.delegation.Delegations#getName(java.lang.String)
      */
     @Override
-    public String getName(String hashKey)
-    {
+    public String getName(String hashKey) {
         X509CertificateChain x509CertificateChain = certificateDAO.get(hashKey);
-        if (x509CertificateChain == null)
-        {
+        if (x509CertificateChain == null) {
             return null;
         }
         String dn = x509CertificateChain.getPrincipal().getName();
@@ -317,17 +281,15 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#getKeys(java.lang.String)
      */
     @Override
-    public KeyPair getKeys(String hashKey)
-    {
-        throw new RuntimeException("getKeys() not implemented in DAO version implementation."); 
+    public KeyPair getKeys(String hashKey) {
+        throw new RuntimeException("getKeys() not implemented in DAO version implementation.");
     }
 
     /* (non-Javadoc)
      * @see org.astrogrid.security.delegation.Delegations#hasCertificate(java.lang.String)
      */
     @Override
-    public boolean hasCertificate(String hashKey)
-    {
+    public boolean hasCertificate(String hashKey) {
         X509CertificateChain chain = certificateDAO.get(hashKey);
         return (chain.getChain() != null);
     }
@@ -336,17 +298,14 @@ public class DatabaseDelegations extends Delegations
      * @see org.astrogrid.security.delegation.Delegations#writeCertificate(java.lang.String, java.io.Writer)
      */
     @Override
-    public void writeCertificate(String hashKey, Writer out) throws IOException
-    {
+    public void writeCertificate(String hashKey, Writer out) throws IOException {
         PEMWriter pem = new PEMWriter(out);
         X509Certificate[] certs = getCertificates(hashKey);
-        if (certs == null)
-        {
+        if (certs == null) {
             throw new IllegalArgumentException(
                     "No certificate corresponding to the haskey: " + hashKey);
         }
-        for (X509Certificate cert : certs)
-        {
+        for (X509Certificate cert : certs) {
             pem.writeObject(cert);
         }
         pem.flush();

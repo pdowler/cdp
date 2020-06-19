@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2016.                            (c) 2016.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -67,71 +67,108 @@
 
 package ca.nrc.cadc.cred.server;
 
-
+import ca.nrc.cadc.auth.SSLUtil;
+import ca.nrc.cadc.auth.X509CertificateChain;
+import ca.nrc.cadc.db.ConnectionConfig;
+import ca.nrc.cadc.db.DBConfig;
+import ca.nrc.cadc.db.DBUtil;
+import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
+import java.io.File;
+import java.util.List;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
  *
  * @author pdowler
  */
-public class CertificateSchemaTest 
-{
-    private static final Logger log = Logger.getLogger(CertificateSchemaTest.class);
+public class CertificateDAOTest {
+    private static final Logger log = Logger.getLogger(CertificateDAOTest.class);
 
-    static
-    {
-        Log4jInit.setLevel("ca.nrc.cadc.cdp.server", Level.INFO);
+    static {
+        Log4jInit.setLevel("ca.nrc.cadc.cred", Level.DEBUG);
+        Log4jInit.setLevel("ca.nrc.cadc.db.version", Level.DEBUG);
     }
     
-    public CertificateSchemaTest() { }
+    CertificateDAO dao;
     
-    @Test
-    public void testTableNameAll()
-    {
-        try
-        {
-            CertificateDAO.CertificateSchema s = new CertificateDAO.CertificateSchema(null, "cat", "sch");
-            Assert.assertTrue(s.getTable().startsWith("cat.sch."));
+    public CertificateDAOTest() throws Exception { 
+        try {
+            DBConfig dbrc = new DBConfig();
+            ConnectionConfig cc = dbrc.getConnectionConfig("CRED_TEST", "cadctest");
+            DBUtil.createJNDIDataSource("jdbc/CertificateDAOTest", cc);
+
+            CertificateDAO.CertificateSchema config = new CertificateDAO.CertificateSchema("jdbc/CertificateDAOTest", null, "cred");
+            this.dao = new CertificateDAO(config);
             
+        } catch (Exception ex) {
+            log.error("setup failed", ex);
+            throw ex;
         }
-        catch(Exception unexpected)
-        {
+    }
+    
+    @Before
+    public void init_cleanup() throws Exception {
+        log.info("init database...");
+        InitDatabaseCDP init = new InitDatabaseCDP(dao.getDataSource(), null, "cred");
+        init.doInit();
+        log.info("init database... OK");
+    }
+    
+    //@Test
+    public void testNoOp() {
+        
+    }
+    
+    //@Test
+    public void testListKeys() {
+        try {
+            List<String> keys = dao.getAllHashKeys();
+            log.info("found keys: " + keys.size());
+        } catch (Exception unexpected) {
             log.error("unexpected exception", unexpected);
             Assert.fail("unexpected exception: " + unexpected);
         }
     }
     
     @Test
-    public void testTableNameCatalogOnly()
-    {
-        try
-        {
-            CertificateDAO.CertificateSchema s = new CertificateDAO.CertificateSchema(null, "cat", null);
-            Assert.assertTrue(s.getTable().startsWith("cat.."));
-        }
-        catch(Exception unexpected)
-        {
+    public void testPutGetUpdateCertificateChain() {
+        try {
+            File pemFile = FileUtil.getFileFromResource("cdp-test.pem", CertificateDAOTest.class);
+            X509CertificateChain cc1 = SSLUtil.readPemCertificateAndKey(pemFile);
+            
+            // not found
+            X509CertificateChain nf = dao.get(cc1.getHashKey());
+            Assert.assertNull(nf);
+            
+            // insert
+            dao.put(cc1);
+            X509CertificateChain cc2 = dao.get(cc1.getHashKey());
+            Assert.assertNotNull(cc2);
+            
+            Thread.sleep(1000L);
+            
+            // update
+            dao.put(cc2);
+            X509CertificateChain cc3 = dao.get(cc1.getHashKey());
+            Assert.assertNotNull(cc3);
+            
+            Thread.sleep(1000L);
+            
+            // delete
+            //dao.delete(cc1.getHashKey());
+            //X509CertificateChain cc4 = dao.get(cc1.getHashKey());
+            //Assert.assertNull(cc4);
+            
+        } catch (Exception unexpected) {
             log.error("unexpected exception", unexpected);
             Assert.fail("unexpected exception: " + unexpected);
         }
     }
     
-    @Test
-    public void testTableNameSchemaOnly()
-    {
-        try
-        {
-            CertificateDAO.CertificateSchema s = new CertificateDAO.CertificateSchema(null, null, "sch");
-            Assert.assertTrue(s.getTable().startsWith("sch."));
-        }
-        catch(Exception unexpected)
-        {
-            log.error("unexpected exception", unexpected);
-            Assert.fail("unexpected exception: " + unexpected);
-        }
-    }
+    
 }

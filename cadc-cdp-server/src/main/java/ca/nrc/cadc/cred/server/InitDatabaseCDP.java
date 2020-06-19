@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2016.                            (c) 2016.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -67,71 +67,47 @@
 
 package ca.nrc.cadc.cred.server;
 
-
-import ca.nrc.cadc.util.Log4jInit;
-import org.apache.log4j.Level;
+import ca.nrc.cadc.db.version.InitDatabase;
+import java.net.URL;
+import javax.sql.DataSource;
 import org.apache.log4j.Logger;
-import org.junit.Assert;
-import org.junit.Test;
 
 /**
  *
  * @author pdowler
  */
-public class CertificateSchemaTest 
-{
-    private static final Logger log = Logger.getLogger(CertificateSchemaTest.class);
-
-    static
-    {
-        Log4jInit.setLevel("ca.nrc.cadc.cdp.server", Level.INFO);
-    }
+public class InitDatabaseCDP extends InitDatabase {
+    private static final Logger log = Logger.getLogger(InitDatabaseCDP.class);
+    public static final String MODEL_NAME = "CDP";
+    public static final String MODEL_VERSION = "1.4";
+    public static final String PREV_MODEL_VERSION = "n/a";
+    //public static final String PREV_MODEL_VERSION = "DO-NOT_UPGRADE-BY-ACCIDENT";
     
-    public CertificateSchemaTest() { }
-    
-    @Test
-    public void testTableNameAll()
-    {
-        try
-        {
-            CertificateDAO.CertificateSchema s = new CertificateDAO.CertificateSchema(null, "cat", "sch");
-            Assert.assertTrue(s.getTable().startsWith("cat.sch."));
+    static String[] CREATE_SQL = new String[] {
+        "cred.ModelVersion.sql",
+        "cred.X509CertificateChain.sql",
+        "cred.permissions.sql"
+    };
             
+    static String[] UPGRADE_SQL = new String[] {
+        "cred.permissions.sql"
+    };
+    
+    public InitDatabaseCDP(DataSource ds, String database, String schema) { 
+        super(ds, database, schema, MODEL_NAME, MODEL_VERSION, PREV_MODEL_VERSION);
+        for (String s : CREATE_SQL) {
+            createSQL.add(s);
         }
-        catch(Exception unexpected)
-        {
-            log.error("unexpected exception", unexpected);
-            Assert.fail("unexpected exception: " + unexpected);
+        for (String s : UPGRADE_SQL) {
+            upgradeSQL.add(s);
         }
+    }
+
+    @Override
+    protected URL findSQL(String fname) {
+        // SQL files are stored inside the jar file
+        return InitDatabase.class.getClassLoader().getResource(fname);
     }
     
-    @Test
-    public void testTableNameCatalogOnly()
-    {
-        try
-        {
-            CertificateDAO.CertificateSchema s = new CertificateDAO.CertificateSchema(null, "cat", null);
-            Assert.assertTrue(s.getTable().startsWith("cat.."));
-        }
-        catch(Exception unexpected)
-        {
-            log.error("unexpected exception", unexpected);
-            Assert.fail("unexpected exception: " + unexpected);
-        }
-    }
     
-    @Test
-    public void testTableNameSchemaOnly()
-    {
-        try
-        {
-            CertificateDAO.CertificateSchema s = new CertificateDAO.CertificateSchema(null, null, "sch");
-            Assert.assertTrue(s.getTable().startsWith("sch."));
-        }
-        catch(Exception unexpected)
-        {
-            log.error("unexpected exception", unexpected);
-            Assert.fail("unexpected exception: " + unexpected);
-        }
-    }
 }
