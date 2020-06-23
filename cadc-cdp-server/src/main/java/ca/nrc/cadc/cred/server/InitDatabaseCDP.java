@@ -79,7 +79,7 @@ import org.apache.log4j.Logger;
 public class InitDatabaseCDP extends InitDatabase {
     private static final Logger log = Logger.getLogger(InitDatabaseCDP.class);
     public static final String MODEL_NAME = "CDP";
-    public static final String MODEL_VERSION = "1.4";
+    public static final String MODEL_VERSION = "1.2";
     public static final String PREV_MODEL_VERSION = "n/a";
     //public static final String PREV_MODEL_VERSION = "DO-NOT_UPGRADE-BY-ACCIDENT";
     

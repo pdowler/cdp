@@ -128,7 +128,7 @@ public class CertificateDAOTest {
         
     }
     
-    //@Test
+    @Test
     public void testListKeys() {
         try {
             List<String> keys = dao.getAllHashKeys();
@@ -167,9 +167,9 @@ public class CertificateDAOTest {
             Thread.sleep(1000L);
             
             // delete
-            //dao.delete(cc1.getHashKey());
-            //X509CertificateChain cc4 = dao.get(cc1.getHashKey());
-            //Assert.assertNull(cc4);
+            dao.delete(cc1.getHashKey());
+            X509CertificateChain cc4 = dao.get(cc1.getHashKey());
+            Assert.assertNull(cc4);
             
         } catch (Exception unexpected) {
             log.error("unexpected exception", unexpected);
