@@ -123,7 +123,6 @@ public class CertificateDAO {
          * @param dataSourceName JNDI DataSource name
          * @param catalog optional catalog (database) name
          * @param schema optional schema name
-         * @param table certificate table name (required)
          */
         public CertificateSchema(String dataSourceName, String catalog, String schema) {
             this.dataSourceName = dataSourceName;
