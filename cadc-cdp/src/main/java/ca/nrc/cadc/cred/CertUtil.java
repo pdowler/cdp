@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2015.                            (c) 2015.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -69,6 +69,7 @@
 
 package ca.nrc.cadc.cred;
 
+import ca.nrc.cadc.auth.X509CertificateChain;
 import java.io.IOException;
 import java.io.Writer;
 import java.math.BigInteger;
@@ -88,9 +89,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Random;
 import java.util.TimeZone;
-
 import javax.security.auth.x500.X500Principal;
-
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.bouncycastle.asn1.DERSequence;
@@ -104,8 +103,6 @@ import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
 import org.bouncycastle.x509.extension.SubjectKeyIdentifierStructure;
 
-import ca.nrc.cadc.auth.X509CertificateChain;
-
 /**
  * Utilities for certificate operations
  */
@@ -114,7 +111,7 @@ public class CertUtil
     
     public static final String DEFAULT_SIGNATURE_ALGORITHM = "SHA256WITHRSA";
     
-    public static final int DEFAULT_KEY_LENGTH = 1024;
+    public static final int DEFAULT_KEY_LENGTH = 2048;
 
     /**
      * Method that generates an X509 proxy certificate

@@ -35,6 +35,8 @@
 package org.astrogrid.security.delegation;
 
 
+import ca.nrc.cadc.cred.CertUtil;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.security.GeneralSecurityException;
@@ -101,7 +103,7 @@ public class InMemoryDelegations extends Delegations
         ex.printStackTrace();
         throw new RuntimeException("The JCE doesn't do RSA! Game over.");
       }
-      keyPairGenerator.initialize(1024);
+      keyPairGenerator.initialize(CertUtil.DEFAULT_KEY_LENGTH);
     }
     
 

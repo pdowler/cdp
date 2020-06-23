@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2011.                            (c) 2011.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -65,31 +65,11 @@
 *  $Revision: 5 $
 *
 ************************************************************************
-*/
+ */
 
 package ca.nrc.cadc.cred.server;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.security.AccessControlException;
-import java.security.PrivilegedActionException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.StringTokenizer;
-
-import javax.security.auth.Subject;
-import javax.security.auth.x500.X500Principal;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.log4j.Logger;
-import org.bouncycastle.openssl.PEMWriter;
-
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.server.actions.DelegationAction;
@@ -98,15 +78,32 @@ import ca.nrc.cadc.io.ByteCountWriter;
 import ca.nrc.cadc.log.ServletLogInfo;
 import ca.nrc.cadc.log.WebServiceLogInfo;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.security.AccessControlException;
+import java.security.PrivilegedActionException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.StringTokenizer;
+import javax.security.auth.Subject;
+import javax.security.auth.x500.X500Principal;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.apache.log4j.Logger;
+import org.bouncycastle.openssl.PEMWriter;
 
 /**
- * Servlet used to download a proxy certificate (PEM file) for the caller or an 
+ * Servlet used to download a proxy certificate (PEM file) for the caller or an
  * optionally specified identity.
- * 
+ *
  */
-public class ProxyServlet extends HttpServlet
-{
+public class ProxyServlet extends HttpServlet {
+
     public static final String TRUSTED_PRINCIPALS_PARAM = "trustedPrincipals";
     public static final String DSNAME = "datasource";
     public static final String CATALOG = "catalog";
@@ -121,108 +118,97 @@ public class ProxyServlet extends HttpServlet
     //
     static final String CERTIFICATE_CONTENT_TYPE = "application/x-pem-file";
     static final String CERTIFICATE_FILENAME = "cadcproxy.pem";
-    
+
     private static final long serialVersionUID = 2740612605831266225L;
     private static Logger LOGGER = Logger.getLogger(ProxyServlet.class);
 
     // The set of trusted principals allowed to call this service
-    private Map<X500Principal, Float> trustedPrincipals =
-            new HashMap<X500Principal, Float>();
+    private Map<X500Principal, Float> trustedPrincipals
+            = new HashMap<X500Principal, Float>();
     private String dataSourceName;
     private String database;
     private String schema;
 
     /**
      * Read the configuration.
-     * @param config            The ServletConfig as provided by the container.
+     *
+     * @param config The ServletConfig as provided by the container.
      * @throws javax.servlet.ServletException
      */
     @Override
-    public void init(final ServletConfig config) 
-        throws ServletException
-    {
+    public void init(final ServletConfig config)
+            throws ServletException {
         super.init(config);
         // get the trusted principals from config
-        String trustedPrincipalsValue =
-                config.getInitParameter(TRUSTED_PRINCIPALS_PARAM);
-        if (trustedPrincipalsValue != null)
-        {
+        String trustedPrincipalsValue
+                = config.getInitParameter(TRUSTED_PRINCIPALS_PARAM);
+        if (trustedPrincipalsValue != null) {
             StringTokenizer st = new StringTokenizer(trustedPrincipalsValue,
-                                                     "\n\t\r", false);
-            while (st.hasMoreTokens())
-            {
+                    "\n\t\r", false);
+            while (st.hasMoreTokens()) {
                 String principalStr = st.nextToken();
                 StringTokenizer st2 = new StringTokenizer(principalStr, ":",
-                                                          false);
+                        false);
                 String principal; // the principal of the trusted client
                 Float maxDaysValid; // maximum lifetime of the returned proxy
 
-                if (st2.countTokens() == 1)
-                {
+                if (st2.countTokens() == 1) {
                     principal = principalStr.trim();
                     maxDaysValid = 30.0f;
-                }
-                else if (st2.countTokens() == 2)
-                {
+                } else if (st2.countTokens() == 2) {
                     principal = st2.nextToken().trim();
                     maxDaysValid = Float.parseFloat(st2.nextToken().trim());
-                    if (maxDaysValid <= 0)
-                    {
+                    if (maxDaysValid <= 0) {
                         throw new IllegalArgumentException(
                                 "Maximum valid days must be positive, "
                                 + maxDaysValid);
                     }
-                }
-                else
-                {
+                } else {
                     throw new IllegalArgumentException(
-                            "Cannot parse trusted principal from servlet " +
-                            "config: " + principalStr);
+                            "Cannot parse trusted principal from servlet "
+                            + "config: " + principalStr);
                 }
-                if (principal != null)
-                {
+                if (principal != null) {
                     principal = principal.replaceAll("\"", "");
                     LOGGER.info("trusted: " + principal + " , max days valid: " + maxDaysValid);
                     trustedPrincipals.put(new X500Principal(principal), maxDaysValid);
                 }
             }
         }
-        
+
         this.dataSourceName = config.getInitParameter(DSNAME);
         this.database = config.getInitParameter(CATALOG);
         this.schema = config.getInitParameter(SCHEMA);
-        
+
         LOGGER.info("persistence: " + dataSourceName + " " + database + " "
-                    + schema);
+                + schema);
     }
 
     /**
      * Obtain the current Subject.
      *
-     * @param request       The HTTP Request.
-     * @return              Subject for the current Request, or null if none.
+     * @param request The HTTP Request.
+     * @return Subject for the current Request, or null if none.
      * @throws IOException
      */
     Subject getCurrentSubject(final HttpServletRequest request)
-            throws IOException
-    {
+            throws IOException {
         return AuthenticationUtil.getSubject(request);
     }
 
     /**
      * Obtain the current X509 certificate chain.
-     * @param request       The HTTP Request.
-     * @param subject       The current Subject.
-     * @return              X509CertificateChain instance.
+     *
+     * @param request The HTTP Request.
+     * @param subject The current Subject.
+     * @return X509CertificateChain instance.
      * @throws Exception
      */
     X509CertificateChain getX509CertificateChain(
             final HttpServletRequest request, final Subject subject)
-            throws Exception
-    {
+            throws Exception {
         AuthMethod am = AuthenticationUtil.getAuthMethod(subject);
-        if ((am == null) || AuthMethod.ANON.equals(am))
-        {
+        if ((am == null) || AuthMethod.ANON.equals(am)) {
             throw new AccessControlException("permission denied");
         }
 
@@ -231,21 +217,15 @@ public class ProxyServlet extends HttpServlet
         DelegationAction delegationAction = factory.getDelegationAction();
 
         X509CertificateChain certificateChain;
-        try
-        {
+        try {
             certificateChain = Subject.doAs(subject, delegationAction);
-        }
-        catch(PrivilegedActionException ex)
-        {
+        } catch (PrivilegedActionException ex) {
             throw ex.getException();
         }
 
-        if (certificateChain.getChain() == null)
-        {
+        if (certificateChain.getChain() == null) {
             throw new ResourceNotFoundException("No signed certificate");
-        }
-        else
-        {
+        } else {
             return certificateChain;
         }
     }
@@ -253,39 +233,32 @@ public class ProxyServlet extends HttpServlet
     /**
      * Write out the certificate chain to the response as a download.
      *
-     * @param certificateChain      The X509CertificateChain instance to write.
-     * @param response              The HTTP Response.
-     * @param logInfo               The logging object to update.
+     * @param certificateChain The X509CertificateChain instance to write.
+     * @param response The HTTP Response.
+     * @param logInfo The logging object to update.
      * @throws Exception
      */
     void writeCertificateChain(final X509CertificateChain certificateChain,
-                               final HttpServletResponse response,
-                               final WebServiceLogInfo logInfo)
-            throws Exception
-    {
+            final HttpServletResponse response,
+            final WebServiceLogInfo logInfo)
+            throws Exception {
         // This is streamed directly, so there is no way to set the content
         // length.
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType(CERTIFICATE_CONTENT_TYPE);
         response.setHeader("Content-Disposition",
-                           "attachment; filename=" + CERTIFICATE_FILENAME);
-        final ByteCountWriter out =
-                new ByteCountWriter(new BufferedWriter(response.getWriter(),
-                                                       8192));
+                "attachment; filename=" + CERTIFICATE_FILENAME);
+        final ByteCountWriter out
+                = new ByteCountWriter(new BufferedWriter(response.getWriter(),
+                        8192));
         final PEMWriter pemWriter = new PEMWriter(out);
 
-        try
-        {
+        try {
             writePEM(certificateChain, pemWriter);
-        }
-        finally
-        {
-            try
-            {
+        } finally {
+            try {
                 pemWriter.close();
-            }
-            catch(IOException ex)
-            {
+            } catch (IOException ex) {
                 // Do nothing
             }
 
@@ -296,18 +269,16 @@ public class ProxyServlet extends HttpServlet
     /**
      * Write out the PEM information.
      *
-     * @param certificateChain      The certificate chain to write.
-     * @param pemWriter             The PEM Writer to write out to.
+     * @param certificateChain The certificate chain to write.
+     * @param pemWriter The PEM Writer to write out to.
      * @throws IOException
      */
     void writePEM(final X509CertificateChain certificateChain,
-                  final PEMWriter pemWriter) throws IOException
-    {
+            final PEMWriter pemWriter) throws IOException {
         pemWriter.writeObject(certificateChain.getChain()[0]);
         pemWriter.writeObject(certificateChain.getPrivateKey());
 
-        for (int i = 1; i < certificateChain.getChain().length; i++)
-        {
+        for (int i = 1; i < certificateChain.getChain().length; i++) {
             pemWriter.writeObject(certificateChain.getChain()[i]);
         }
 
@@ -316,76 +287,61 @@ public class ProxyServlet extends HttpServlet
 
     /**
      * Handles the HTTP <code>GET</code> method.
-     * 
+     *
      * @param request servlet request
      * @param response servlet response
      * @throws java.io.IOException
      */
     @Override
     protected void doGet(HttpServletRequest request,
-                         HttpServletResponse response)
-        throws IOException
-    {
+            HttpServletResponse response)
+            throws IOException {
         WebServiceLogInfo logInfo = new ServletLogInfo(request);
         LOGGER.info(logInfo.start());
         long start = System.currentTimeMillis();
-        try
-        {
+        try {
             final Subject subject = getCurrentSubject(request);
             logInfo.setSubject(subject);
-            
-            final X509CertificateChain certificateChain =
-                    getX509CertificateChain(request, subject);
+
+            final X509CertificateChain certificateChain
+                    = getX509CertificateChain(request, subject);
 
             writeCertificateChain(certificateChain, response, logInfo);
-        }
-        catch(IllegalArgumentException ex)
-        {
+        } catch (IllegalArgumentException ex) {
             logInfo.setMessage(ex.getMessage());
             logInfo.setSuccess(true);
             LOGGER.debug("invalid input", ex);
             writeError(response, HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
-        }
-        catch(UnsupportedOperationException ex)
-        {
+        } catch (UnsupportedOperationException ex) {
             logInfo.setMessage(ex.getMessage());
             logInfo.setSuccess(true);
             LOGGER.debug("unsupported", ex);
             writeError(response, HttpServletResponse.SC_NOT_IMPLEMENTED, ex.getMessage());
-        }
-        catch(AccessControlException ex)
-        {
+        } catch (AccessControlException ex) {
             logInfo.setMessage(ex.getMessage());
             logInfo.setSuccess(true);
             LOGGER.debug("unauthorized", ex);
             writeError(response, HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
-        }
-        catch(ResourceNotFoundException ex)
-        {
+        } catch (ResourceNotFoundException ex) {
             logInfo.setMessage(ex.getMessage());
             logInfo.setSuccess(true);
             LOGGER.debug("certificate not found", ex);
             writeError(response, HttpServletResponse.SC_NOT_FOUND, ex.getMessage());
-        }
-        catch (Throwable t)
-        {
+        } catch (Throwable t) {
             String message = t.getMessage();
             logInfo.setMessage(message);
             logInfo.setSuccess(false);
 
             LOGGER.error(message, t);
             writeError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, message);
-        }
-        finally
-        {
+        } finally {
             logInfo.setElapsedTime(System.currentTimeMillis() - start);
             LOGGER.info(logInfo.end());
         }
     }
-    
+
     private void writeError(HttpServletResponse response, int code, String message)
-        throws IOException
-    {
+            throws IOException {
         response.setContentType("text/plain");
         response.setStatus(code);
         PrintWriter pw = new PrintWriter(response.getWriter());
@@ -394,8 +350,7 @@ public class ProxyServlet extends HttpServlet
         pw.close();
     }
 
-    public Map<X500Principal, Float> getTrustedPrincipals()
-    {
+    public Map<X500Principal, Float> getTrustedPrincipals() {
         return Collections.unmodifiableMap(trustedPrincipals);
     }
 }
