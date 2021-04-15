@@ -17,11 +17,11 @@ jobs:
         java-version: 8
         
     - name: build and test cadc-cdp
-      run: cd cadc-cdp && gradle --info clean build javadoc install
+      run: cd cadc-cdp && ../gradlew --info clean build javadoc install
     
     - name: build and test cadc-cdp-server
-      run: cd cadc-cdp-server && gradle --info clean build javadoc install
+      run: cd cadc-cdp-server && ../gradlew --info clean build javadoc install
       
     - name: build cadc-cert-gen
-      run: cd cadc-cert-gen && gradle --info clean build
+      run: cd cadc-cert-gen && ../gradlew --info clean build
       
