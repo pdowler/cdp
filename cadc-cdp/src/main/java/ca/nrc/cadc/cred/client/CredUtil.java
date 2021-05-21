@@ -189,12 +189,12 @@ public class CredUtil {
      */
     public static boolean checkCredentials(final Subject subject)
             throws AccessControlException, CertificateExpiredException, CertificateNotYetValidException {
-        AuthMethod am = AuthenticationUtil.getAuthMethod(subject);
-        if (am == null || AuthMethod.ANON.equals(am)) {
-            return false;
-        }
 
+        // do not check if/how the caller authenticated: just look at principals and credentials
+        
         // first see if there are valid cookie credentials
+        // TODO: a cookie is only valid for a single domain, but we don't know what the caller
+        // intends to do so we can't actually determine if they have an SSOCookieCredential for that
         Set<SSOCookieCredential> cookieCreds = subject.getPublicCredentials(SSOCookieCredential.class);
         for (SSOCookieCredential nextCookie : cookieCreds) {
             log.debug("Checking cookie credential: " + nextCookie);
@@ -203,51 +203,52 @@ public class CredUtil {
             }
         }
 
-        // next see if there is a valid certificate chain. get one from cdp
-        // if there isn't
-        try {
-            X509CertificateChain privateKeyChain = X509CertificateChain
-                    .findPrivateKeyChain(subject.getPublicCredentials());
-
-            if (privateKeyChain != null) {
-                try {
-                    privateKeyChain.getChain()[0].checkValidity();
-                } catch (CertificateException ex) {
-                    privateKeyChain = null; // get new one below
-                }
-            }
-
-            if (privateKeyChain == null) {
-                LocalAuthority loc = new LocalAuthority();
-                URI credURI = loc.getServiceURI(Standards.CRED_PROXY_10.toASCIIString());
-                final CredClient cred = new CredClient(credURI);
-                Subject opsSubject = createOpsSubject();
-                try {
-                    privateKeyChain = Subject.doAs(opsSubject, new PrivilegedExceptionAction<X509CertificateChain>() {
-                        public X509CertificateChain run() throws Exception {
-                            return cred.getProxyCertificate(subject, PROXY_CERT_DURATION);
-                        }
-                    });
-                } catch (PrivilegedActionException ex) {
-                    throw new RuntimeException("CredClient.getProxyCertficate failed", ex.getException());
-                }
-
-                if (privateKeyChain == null) {
-                    throw new AccessControlException("credential service did not return a delegated certificate");
-                }
-
+        // TODO: check for valid AuthorizationToken
+        
+        // check for a valid X509CertificateChain
+        X509CertificateChain privateKeyChain = X509CertificateChain.findPrivateKeyChain(subject.getPublicCredentials());
+        if (privateKeyChain != null) {
+            try {
                 privateKeyChain.getChain()[0].checkValidity();
-                // carefully remove the previous chain
-                Iterator iter = subject.getPublicCredentials().iterator();
-                while (iter.hasNext()) {
-                    Object o = iter.next();
-                    if (o instanceof X509CertificateChain)
-                        iter.remove();
-                }
-                subject.getPublicCredentials().add(privateKeyChain);
+                return true;
+            } catch (CertificateException ex) {
+                privateKeyChain = null; // get new one below
             }
-        } finally {
         }
-        return true;
+
+        // get a valid proxy cert from local CDP service: requires an identity
+        if (subject.getPrincipals().isEmpty()) {
+            return false;
+        }
+        LocalAuthority loc = new LocalAuthority();
+        URI credURI = loc.getServiceURI(Standards.CRED_PROXY_10.toASCIIString());
+        final CredClient cred = new CredClient(credURI);
+        Subject opsSubject = createOpsSubject();
+        try {
+            privateKeyChain = Subject.doAs(opsSubject, new PrivilegedExceptionAction<X509CertificateChain>() {
+                public X509CertificateChain run() throws Exception {
+                    return cred.getProxyCertificate(subject, PROXY_CERT_DURATION);
+                }
+            });
+        } catch (PrivilegedActionException ex) {
+            throw new RuntimeException("CredClient.getProxyCertficate failed", ex.getException());
+        }
+
+        if (privateKeyChain == null) {
+            throw new AccessControlException("credential service did not return a delegated certificate");
+        }
+
+        privateKeyChain.getChain()[0].checkValidity();
+        // carefully remove the previous chain
+        Iterator iter = subject.getPublicCredentials().iterator();
+        while (iter.hasNext()) {
+            Object o = iter.next();
+            if (o instanceof X509CertificateChain) {
+                iter.remove();
+            }
+        }
+        subject.getPublicCredentials().add(privateKeyChain);
+        
+        return false;
     }
 }
