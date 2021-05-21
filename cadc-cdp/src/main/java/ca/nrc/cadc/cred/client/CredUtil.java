@@ -220,6 +220,7 @@ public class CredUtil {
         if (subject.getPrincipals().isEmpty()) {
             return false;
         }
+        
         LocalAuthority loc = new LocalAuthority();
         URI credURI = loc.getServiceURI(Standards.CRED_PROXY_10.toASCIIString());
         final CredClient cred = new CredClient(credURI);
@@ -249,6 +250,6 @@ public class CredUtil {
         }
         subject.getPublicCredentials().add(privateKeyChain);
         
-        return false;
+        return true;
     }
 }
