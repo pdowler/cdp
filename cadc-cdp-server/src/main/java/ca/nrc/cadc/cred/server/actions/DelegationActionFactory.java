@@ -69,21 +69,22 @@
 
 package ca.nrc.cadc.cred.server.actions;
 
-import ca.nrc.cadc.auth.*;
-
-import java.util.List;
-import java.util.Map;
-
-import javax.security.auth.x500.X500Principal;
-import javax.servlet.http.HttpServletRequest;
-
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.PrincipalExtractor;
+import ca.nrc.cadc.auth.SSOCookieCredential;
+import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.server.CertificateDAO;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.profiler.Profiler;
 import java.security.Principal;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.security.auth.Subject;
+import javax.security.auth.x500.X500Principal;
+import javax.servlet.http.HttpServletRequest;
 import org.apache.log4j.Logger;
 
 /**
@@ -216,21 +217,6 @@ public class DelegationActionFactory
 
             public X509CertificateChain getCertificateChain()
             {
-                return null;
-            }
-
-            public DelegationToken getDelegationToken()
-            {
-                return null;
-            }
-
-            /**
-             * Create and return a SSOCookieCredential from the request
-             *
-             * @return
-             */
-            @Override
-            public List<SSOCookieCredential> getSSOCookieCredentials() {
                 return null;
             }
         });

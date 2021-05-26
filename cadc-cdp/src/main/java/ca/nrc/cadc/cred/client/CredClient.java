@@ -75,7 +75,7 @@ import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.CertUtil;
-import ca.nrc.cadc.net.HttpDownload;
+import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.profiler.Profiler;
@@ -149,8 +149,8 @@ public class CredClient
      * @throws ca.nrc.cadc.net.ResourceNotFoundException 
      */
     public X509CertificateChain getProxyCertificate(Subject subject, double daysValid)
-            throws AccessControlException, CertificateException,  IOException, ResourceNotFoundException
-    {
+            throws AccessControlException, CertificateException, IOException, ResourceNotFoundException {
+        
         Set<Principal> principals = subject.getPrincipals();
         // get the first available X500, HTTP Principal
         X500Principal x500Principal = null;
@@ -948,7 +948,7 @@ public class CredClient
         try
         {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            HttpDownload get = new HttpDownload(location, bos);
+            HttpGet get = new HttpGet(location, bos);
             
             get.run();
             if ( get.getThrowable() != null)
