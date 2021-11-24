@@ -192,9 +192,10 @@ public class CredUtil {
 
         // do not check if/how the caller authenticated: just look at principals and credentials
         
-        // first see if there are valid cookie credentials
+        // 
         // TODO: a cookie is only valid for a single domain, but we don't know what the caller
         // intends to do so we can't actually determine if they have an SSOCookieCredential for that
+        log.debug("check for valid cookie credentials...");
         Set<SSOCookieCredential> cookieCreds = subject.getPublicCredentials(SSOCookieCredential.class);
         for (SSOCookieCredential nextCookie : cookieCreds) {
             log.debug("Checking cookie credential: " + nextCookie);
@@ -202,22 +203,25 @@ public class CredUtil {
                 return true;
             }
         }
-
+        log.debug("... no valid cookies"); 
         // TODO: check for valid AuthorizationToken
         
-        // check for a valid X509CertificateChain
+        log.debug("check for a valid X509CertificateChain...");
         X509CertificateChain privateKeyChain = X509CertificateChain.findPrivateKeyChain(subject.getPublicCredentials());
         if (privateKeyChain != null) {
             try {
                 privateKeyChain.getChain()[0].checkValidity();
                 return true;
             } catch (CertificateException ex) {
+                log.debug("invalid X509CertificateChain: removing"); 
                 privateKeyChain = null; // get new one below
             }
         }
-
+        log.debug("... no valid X509CertificateChain"); 
+        
         // get a valid proxy cert from local CDP service: requires an identity
         if (subject.getPrincipals().isEmpty()) {
+            log.debug("no principals: return false"); 
             return false;
         }
         

@@ -160,11 +160,11 @@ public class Main implements PrivilegedAction<Boolean>
         // Set debug mode
         if (argMap.isSet(ARG_DEBUG) || argMap.isSet(ARG_D))
         {
-            Log4jInit.setLevel("ca.nrc.cadc.cred.client", Level.DEBUG);
+            Log4jInit.setLevel("ca.nrc.cadc.cred", Level.DEBUG);
         }
         else if (argMap.isSet(ARG_VERBOSE) || argMap.isSet(ARG_V))
         {
-            Log4jInit.setLevel("ca.nrc.cadc.cred.client", Level.INFO);
+            Log4jInit.setLevel("ca.nrc.cadc.cred", Level.INFO);
         }
         else
             Log4jInit.setLevel("ca", Level.WARN);
