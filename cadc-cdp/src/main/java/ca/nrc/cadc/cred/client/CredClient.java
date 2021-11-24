@@ -195,9 +195,10 @@ public class CredClient
             }
 
             LOGGER.debug("serviceID: " + this.serviceID);
-            URL credUrl = getRegistryClient()
-                .getServiceURL(this.serviceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
-            LOGGER.debug("credUrl is null: " + (credUrl == null));
+            URL credUrl = getRegistryClient().getServiceURL(this.serviceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
+            if (credUrl == null) {
+                throw new RuntimeException("lookup failed: " + serviceID + " + " + Standards.CRED_PROXY_10 + " + " + AuthMethod.CERT);
+            }
             URL url = new URL(credUrl.toExternalForm() + path.toString());
             LOGGER.debug("getCertficate: " + url.toString());
             return downloadCertificate(url);
