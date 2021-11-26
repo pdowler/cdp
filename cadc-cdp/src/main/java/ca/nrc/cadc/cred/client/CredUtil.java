@@ -190,7 +190,9 @@ public class CredUtil {
     public static boolean checkCredentials(final Subject subject)
             throws AccessControlException, CertificateExpiredException, CertificateNotYetValidException {
 
-        // do not check if/how the caller authenticated: just look at principals and credentials
+        if (subject == null) {
+            return false;
+        }
         
         // 
         // TODO: a cookie is only valid for a single domain, but we don't know what the caller
