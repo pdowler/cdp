@@ -215,7 +215,12 @@ public class ProxyServlet extends HttpServlet {
      */
     Subject getCurrentSubject(final HttpServletRequest request)
             throws IOException {
-        return AuthenticationUtil.getSubject(request);
+        Subject ret = AuthenticationUtil.getSubject(request, false);
+        if (!AuthMethod.CERT.equals(AuthenticationUtil.getAuthMethod(ret))) {
+            // need to augment
+            AuthenticationUtil.augmentSubject(ret);
+        }
+        return ret;
     }
 
     /**
