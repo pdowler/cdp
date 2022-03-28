@@ -25,3 +25,6 @@ jobs:
     - name: build cadc-cert-gen
       run: cd cadc-cert-gen && ../gradlew --info clean build
       
+    - name: build cred
+      run: cd cadc-cert-gen && ../gradlew --info clean build
+      
