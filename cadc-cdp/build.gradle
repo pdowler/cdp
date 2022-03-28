@@ -24,8 +24,10 @@ mainClassName = 'ca.nrc.cadc.cred.client.Main'
 dependencies {
     compile 'log4j:log4j:[1.2,1.3)'
     compile 'xerces:xercesImpl:[2.12.1,3.0)'
-    compile 'org.bouncycastle:bcprov-jdk15on:1.50'
-    compile 'org.bouncycastle:bcpkix-jdk15on:1.50'
+    compile 'org.bouncycastle:bcprov-jdk15on:1.46'
+
+    // after 1.46, openssl package moved to bcpkix
+    //compile 'org.bouncycastle:bcpkix-jdk15on:1.70'
 
     compile 'org.opencadc:cadc-util:[1.3.10,)'
     compile 'org.opencadc:cadc-registry:[1.4,)'

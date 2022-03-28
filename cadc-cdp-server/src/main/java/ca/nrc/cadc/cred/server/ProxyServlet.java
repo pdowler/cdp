@@ -82,11 +82,15 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.AccessControlException;
+import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.security.auth.Subject;
 import javax.security.auth.x500.X500Principal;
 import javax.servlet.ServletConfig;
@@ -125,9 +129,10 @@ public class ProxyServlet extends HttpServlet {
     // The set of trusted principals allowed to call this service
     private Map<X500Principal, Float> trustedPrincipals
             = new HashMap<X500Principal, Float>();
-    private String dataSourceName;
-    private String database;
-    private String schema;
+    // defaults that web.xml can override for backwards compat
+    private String dataSourceName = "jdbc/cred";
+    private String database = null;
+    private String schema = "cred";
 
     /**
      * Read the configuration.
@@ -139,7 +144,24 @@ public class ProxyServlet extends HttpServlet {
     public void init(final ServletConfig config)
             throws ServletException {
         super.init(config);
-        // get the trusted principals from config
+        
+        // try to find CredConfig object
+        try {
+            Context initialContext = new InitialContext();
+            CredConfig cc = (CredConfig) initialContext.lookup(CredConfig.JDNI_KEY);
+            LOGGER.warn("JDNI config: " + cc);
+            if (cc != null) {
+                for (X500Principal p : cc.getProxyUsers()) {
+                    trustedPrincipals.put(p, cc.proxyMaxDaysValid);
+                    LOGGER.warn("trusted: " + p + " " + cc.proxyMaxDaysValid);
+                }
+            }
+            return;
+        } catch (NamingException ex) {
+            LOGGER.warn("BUG: unable to lookup CredConfig with key " + CredConfig.JDNI_KEY, ex);
+        }
+        
+        // backwards compat: get config from servlet config
         String trustedPrincipalsValue
                 = config.getInitParameter(TRUSTED_PRINCIPALS_PARAM);
         if (trustedPrincipalsValue != null) {
