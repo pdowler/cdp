@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2020.                            (c) 2020.
+*  (c) 2022.                            (c) 2022.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -114,16 +114,16 @@ public class CadcDelegationServlet extends DelegationServlet {
         try {
             Context initialContext = new InitialContext();
             CredConfig cc = (CredConfig) initialContext.lookup(CredConfig.JDNI_KEY);
-            LOGGER.warn("JDNI config: " + cc);
+            LOGGER.info("JDNI config: " + cc);
             if (cc != null) {
                 for (X500Principal p : cc.getDelegateUsers()) {
                     suDNs.add(p);
-                    LOGGER.warn("SU: " + p + " " + cc.proxyMaxDaysValid);
+                    LOGGER.info("SU: " + p + " " + cc.proxyMaxDaysValid);
                 }
             }
             return;
         } catch (NamingException ex) {
-            LOGGER.warn("BUG: unable to lookup CredConfig with key " + CredConfig.JDNI_KEY, ex);
+            LOGGER.debug("BUG: unable to lookup CredConfig with key " + CredConfig.JDNI_KEY, ex);
         }
         
         String suDNStr = config.getInitParameter(SU_DNS);

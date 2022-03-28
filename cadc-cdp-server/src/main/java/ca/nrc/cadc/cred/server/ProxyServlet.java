@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2020.                            (c) 2020.
+*  (c) 2022.                            (c) 2022.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -82,7 +82,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.AccessControlException;
-import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -149,16 +148,16 @@ public class ProxyServlet extends HttpServlet {
         try {
             Context initialContext = new InitialContext();
             CredConfig cc = (CredConfig) initialContext.lookup(CredConfig.JDNI_KEY);
-            LOGGER.warn("JDNI config: " + cc);
+            LOGGER.info("JDNI config: " + cc);
             if (cc != null) {
                 for (X500Principal p : cc.getProxyUsers()) {
                     trustedPrincipals.put(p, cc.proxyMaxDaysValid);
-                    LOGGER.warn("trusted: " + p + " " + cc.proxyMaxDaysValid);
+                    LOGGER.info("trusted: " + p + " " + cc.proxyMaxDaysValid);
                 }
             }
             return;
         } catch (NamingException ex) {
-            LOGGER.warn("BUG: unable to lookup CredConfig with key " + CredConfig.JDNI_KEY, ex);
+            LOGGER.debug("BUG: unable to lookup CredConfig with key " + CredConfig.JDNI_KEY, ex);
         }
         
         // backwards compat: get config from servlet config

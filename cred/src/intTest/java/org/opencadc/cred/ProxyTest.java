@@ -107,14 +107,16 @@ public class ProxyTest
     {
         try
         {
-            // TODO: need a real external certificate where 
-            // -- the DN *does not* to a registered user (eg augments)
-            // -- the certificate is *not* managed by cadc-cert-gen
-            File cf = FileUtil.getFileFromResource("servops.pem", DelegationTest.class);
+            // this is the cert that is allowed to get other user certs
+            File cf = FileUtil.getFileFromResource("cred-test-super.pem", DelegationTest.class);
             Subject caller = SSLUtil.createSubject(cf);
             log.info("subject: " + caller);
             
-            File cf2 = FileUtil.getFileFromResource("x509_CADCRegtest1.pem", DelegationTest.class);
+            // this is the target identity
+            // HACK: (hopefully) it has been delegated by the DelegationTest already
+            // this is not a great test if both these certs are the same ident because users
+            // can always download their own proxy cert
+            File cf2 = FileUtil.getFileFromResource("cred-test.pem", DelegationTest.class);
             final Subject target = SSLUtil.createSubject(cf2);
             Assert.assertEquals(2, target.getPublicCredentials().size()); // X509CertificateChain + AuthMethod
             Iterator iter = target.getPublicCredentials().iterator();
