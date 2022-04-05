@@ -8,7 +8,6 @@ import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
-
 import javax.security.auth.x500.X500Principal;
 
 /**
@@ -31,8 +30,7 @@ public abstract class Delegations
             // implementation class
             try
             {
-                Class<?> implClass = Class
-                        .forName("org.astrogrid.security.delegation.DelegationsImpl");
+                Class<?> implClass = Class.forName("org.opencadc.cred.DelegationsImpl");
                 instance = (Delegations) implClass.newInstance();
             }
             catch (ClassNotFoundException ex)

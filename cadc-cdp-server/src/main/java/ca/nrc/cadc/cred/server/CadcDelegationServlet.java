@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2020.                            (c) 2020.
+*  (c) 2022.                            (c) 2022.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -81,6 +81,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.security.auth.Subject;
 import javax.security.auth.x500.X500Principal;
 import javax.servlet.ServletConfig;
@@ -106,6 +109,23 @@ public class CadcDelegationServlet extends DelegationServlet {
     public void init(final ServletConfig config)
             throws ServletException {
         super.init(config);
+        
+        // try to find CredConfig object
+        try {
+            Context initialContext = new InitialContext();
+            CredConfig cc = (CredConfig) initialContext.lookup(CredConfig.JDNI_KEY);
+            LOGGER.info("JDNI config: " + cc);
+            if (cc != null) {
+                for (X500Principal p : cc.getDelegateUsers()) {
+                    suDNs.add(p);
+                    LOGGER.info("SU: " + p + " " + cc.proxyMaxDaysValid);
+                }
+            }
+            return;
+        } catch (NamingException ex) {
+            LOGGER.debug("BUG: unable to lookup CredConfig with key " + CredConfig.JDNI_KEY, ex);
+        }
+        
         String suDNStr = config.getInitParameter(SU_DNS);
         if (suDNStr != null) {
             String[] dns = suDNStr.split("\n");
@@ -190,9 +210,9 @@ public class CadcDelegationServlet extends DelegationServlet {
         if (ca != null && ca.length > 0) {
             certs = Arrays.asList(ca);
         }
-        // only ssl connections accepted (no remote user)
 
-        Subject callerSubject = AuthenticationUtil.getSubject(request);
+        // caller must be authenticating by certificate so we do not need to augment subject
+        Subject callerSubject = AuthenticationUtil.getSubject(request, false);
         Subject ret = callerSubject;
 
         // check whether user is superuser executing something on users
