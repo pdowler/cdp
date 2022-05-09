@@ -42,9 +42,10 @@ import org.apache.log4j.Logger;
 
 import ca.nrc.cadc.auth.CertCmdArgUtil;
 import ca.nrc.cadc.util.ArgumentMap;
-import ca.nrc.cadc.util.LogArgUtil;
+import ca.nrc.cadc.util.Log4jInit;
 import java.net.URI;
 import java.net.URISyntaxException;
+import org.apache.log4j.Level;
 
 /**
  * Main class for the CertGenerator Discovery Agent. The DA generates
@@ -73,6 +74,13 @@ public class Main
     public static final int STATUS_OK = 0; // exit code for successful execution
     protected static final int DEFAULT_EXPIRE = 30; // Default to 30 days
 
+    private final static String[] LOG_PKGS = new String[] {
+        "ca.nrc.cadc.cert",
+        "ca.nrc.cadc.cred",
+        "ca.nrc.cadc.net"
+
+    };
+    
     // authenticated subject
     protected static Subject subject;
     private ArgumentMap argMap;
@@ -102,13 +110,16 @@ public class Main
 
     private int doit(final String[] args) throws Exception
     {
-        LogArgUtil.initialize(new String[]
-        {
-            "ca.nrc.cadc.cert",
-            "ca.nrc.cadc.cred",
-            "ca.nrc.cadc.net"
-                
-        }, args);
+        ArgumentMap am = new ArgumentMap(args);
+        Level logLevel = Level.WARN;
+        if (am.isSet("d") || am.isSet("debug")) {
+            logLevel = Level.DEBUG;
+        } else if (am.isSet("v") || am.isSet("verbose")) {
+            logLevel = Level.INFO;
+        }
+        for (String s : LOG_PKGS) {
+            Log4jInit.setLevel("cadc-cert-gen", s, logLevel);
+        }
         
         this.argMap = new ArgumentMap(args);
         if (this.argMap.isSet(ARG_HELP) || this.argMap.isSet(ARG_H))
