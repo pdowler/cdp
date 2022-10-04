@@ -229,6 +229,11 @@ public class CredUtil {
         
         LocalAuthority loc = new LocalAuthority();
         URI credURI = loc.getServiceURI(Standards.CRED_PROXY_10.toASCIIString());
+        if (credURI == null) {
+            log.debug("checkCredentials: no local CDP service " + Standards.CRED_PROXY_10 + " in LocalAuthority");
+            return false;
+        }
+        
         final CredClient cred = new CredClient(credURI);
         Subject opsSubject = createOpsSubject();
         try {
