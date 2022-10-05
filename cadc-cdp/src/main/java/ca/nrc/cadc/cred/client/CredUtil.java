@@ -76,6 +76,7 @@ import ca.nrc.cadc.auth.SSOCookieCredential;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
+
 import java.io.File;
 import java.net.URI;
 import java.security.AccessControlException;
@@ -86,12 +87,14 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import javax.naming.InitialContext;
 import javax.naming.NameNotFoundException;
 import javax.naming.NamingException;
 import javax.security.auth.Subject;
+
 import org.apache.log4j.Logger;
 
 /**
@@ -228,7 +231,14 @@ public class CredUtil {
         }
         
         LocalAuthority loc = new LocalAuthority();
-        URI credURI = loc.getServiceURI(Standards.CRED_PROXY_10.toASCIIString());
+        URI credURI;
+        try {
+            credURI = loc.getServiceURI(Standards.CRED_PROXY_10.toASCIIString());
+        } catch (NoSuchElementException ex) {
+            log.debug("checkCredentials: no local CDP service " + Standards.CRED_PROXY_10 + " in LocalAuthority");
+            return false;
+        }
+        // just in case LocalAuthority changes to return null (TBD)
         if (credURI == null) {
             log.debug("checkCredentials: no local CDP service " + Standards.CRED_PROXY_10 + " in LocalAuthority");
             return false;
