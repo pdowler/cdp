@@ -71,6 +71,7 @@ package ca.nrc.cadc.cred.client;
 
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.SSOCookieCredential;
 import ca.nrc.cadc.auth.X509CertificateChain;
@@ -209,7 +210,14 @@ public class CredUtil {
             }
         }
         log.debug("... no valid cookies"); 
-        // TODO: check for valid AuthorizationToken
+        
+        // TODO: check domains
+        log.debug("check for auth tokens...");
+        Set<AuthorizationToken> tokens = subject.getPublicCredentials(AuthorizationToken.class);
+        if (!tokens.isEmpty()) {
+            return true;
+        }
+        log.debug("... no tokens"); 
         
         log.debug("check for a valid X509CertificateChain...");
         X509CertificateChain privateKeyChain = X509CertificateChain.findPrivateKeyChain(subject.getPublicCredentials());
