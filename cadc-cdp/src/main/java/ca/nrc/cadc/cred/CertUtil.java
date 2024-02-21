@@ -69,7 +69,6 @@
 
 package ca.nrc.cadc.cred;
 
-import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import java.io.IOException;
 import java.io.Writer;
@@ -102,15 +101,14 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
-import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyUsage;
-import org.bouncycastle.cert.CertIOException;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509ExtensionUtils;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.operator.ContentSigner;
@@ -207,73 +205,34 @@ public class CertUtil {
         X509v3CertificateBuilder certGen = new X509v3CertificateBuilder(issuer,
                 serial, beforeDate, afterDate, subject, csr.getSubjectPublicKeyInfo());
 
-        
-        // extensions
-        // add ProxyCertInfo extension to the new cert
         try {
+            // add ProxyCertInfo extension
+            ASN1EncodableVector policy = new ASN1EncodableVector();
+            policy.add(new ASN1ObjectIdentifier("1.3.6.1.5.5.7.21.1")); // IMPERSONATION aka proxy certificate
+            ASN1EncodableVector vec = new ASN1EncodableVector();
+            //policy.add(pathLengthConstr);
+            vec.add(new DERSequence(policy));
+            ASN1ObjectIdentifier extProxyCert = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.1.14");
+            certGen.addExtension(extProxyCert, true, new DERSequence(vec));
+            
             BcDigestCalculatorProvider dcp = new BcDigestCalculatorProvider();
             DigestCalculator dc = dcp.get(new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1)); // RFC 5280
             X509ExtensionUtils x509ext = new X509ExtensionUtils(dc);
 
-            certGen.addExtension(Extension.keyUsage, true,
-                    new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment).getEncoded());
-
-            certGen.addExtension(Extension.authorityKeyIdentifier, false, 
-                    x509ext.createAuthorityKeyIdentifier(csr.getSubjectPublicKeyInfo()));
+            certGen.addExtension(Extension.keyUsage, false,
+                    new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment | KeyUsage.dataEncipherment).getEncoded());
 
             certGen.addExtension(Extension.subjectKeyIdentifier, false, 
                     x509ext.createSubjectKeyIdentifier(csr.getSubjectPublicKeyInfo()));
 
-            certGen.addExtension(Extension.basicConstraints, true, new BasicConstraints(false).getEncoded());
+            X509CertificateHolder issuerCH = new JcaX509CertificateHolder(issuerCert);
+            certGen.addExtension(Extension.authorityKeyIdentifier, false, x509ext.createAuthorityKeyIdentifier(issuerCH));
+
+            //certGen.addExtension(Extension.basicConstraints, true, new BasicConstraints(false).getEncoded());
         } catch (IOException | OperatorCreationException ex) {
             throw new RuntimeException("failed to add X509 extensions", ex);
         }
         
-        // add the Proxy Certificate Information
-        // I expect this code to be removed once support to proxy
-        // certificates is provided in Bouncy Castle.
-        // create a proxy policy
-        // types of proxy certificate policies - see RFC3820
-        // impersonates the user
-        final ASN1ObjectIdentifier IMPERSONATION = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.21.1");
-        // independent
-        // final DERObjectIdentifier INDEPENDENT = new
-        // DERObjectIdentifier(
-        // "1.3.6.1.5.5.7.21.2");
-        // defined by a policy language
-        // final DERObjectIdentifier LIMITED = new DERObjectIdentifier(
-        // "1.3.6.1.4.1.3536.1.1.1.9");
-
-        ASN1EncodableVector policy = new ASN1EncodableVector();
-        policy.add(IMPERSONATION);
-
-        // pathLengthConstr (RFC3820)
-        // The pCPathLenConstraint field, if present, specifies the
-        // maximum
-        // depth of the path of Proxy Certificates that can be signed by
-        // this
-        // Proxy Certificate. A pCPathLenConstraint of 0 means that this
-        // certificate MUST NOT be used to sign a Proxy Certificate. If
-        // the
-        // pCPathLenConstraint field is not present then the maximum proxy
-        // path
-        // length is unlimited. End entity certificates have unlimited
-        // maximum
-        // proxy path lengths.
-        // DERInteger pathLengthConstr = new DERInteger(100);
-        // create the proxy certificate information
-        ASN1EncodableVector vec = new ASN1EncodableVector();
-        // policy.add(pathLengthConstr);
-        vec.add(new DERSequence(policy));
-
-        // OID
-        final ASN1ObjectIdentifier OID = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.1.14");
-        try {
-            certGen.addExtension(OID, true, new DERSequence(vec));
-        } catch (CertIOException ex) {
-            throw new RuntimeException("failed to add X509 proxy extension", ex);
-        }
-
         try {
             ContentSigner signer = new JcaContentSignerBuilder(DEFAULT_SIGNATURE_ALGORITHM).setProvider("BC").build(issuerKey);
             JcaX509CertificateConverter converter = new JcaX509CertificateConverter().setProvider("BC");
