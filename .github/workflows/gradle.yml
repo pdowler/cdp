@@ -22,9 +22,9 @@ jobs:
     - name: build and test cadc-cdp-server
       run: cd cadc-cdp-server && ../gradlew --info clean build javadoc install
       
-    - name: build cadc-cert-gen
-      run: cd cadc-cert-gen && ../gradlew --info clean build
+#    - name: build cadc-cert-gen
+#      run: cd cadc-cert-gen && ../gradlew --info clean build
       
     - name: build cred
-      run: cd cadc-cert-gen && ../gradlew --info clean build
+      run: cd cred && ../gradlew --info clean build
       
