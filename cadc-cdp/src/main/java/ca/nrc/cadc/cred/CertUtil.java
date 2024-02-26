@@ -206,7 +206,7 @@ public class CertUtil {
                 serial, beforeDate, afterDate, subject, csr.getSubjectPublicKeyInfo());
 
         try {
-            // add ProxyCertInfo extension
+            // add ProxyCertInfo extension manually since BC 1.70+ does not have a suitable Extension.
             ASN1EncodableVector policy = new ASN1EncodableVector();
             policy.add(new ASN1ObjectIdentifier("1.3.6.1.5.5.7.21.1")); // IMPERSONATION aka proxy certificate
             ASN1EncodableVector vec = new ASN1EncodableVector();
@@ -214,6 +214,7 @@ public class CertUtil {
             vec.add(new DERSequence(policy));
             ASN1ObjectIdentifier extProxyCert = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.1.14");
             certGen.addExtension(extProxyCert, true, new DERSequence(vec));
+            // end: ProxyCertInfo
             
             BcDigestCalculatorProvider dcp = new BcDigestCalculatorProvider();
             DigestCalculator dc = dcp.get(new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1)); // RFC 5280
