@@ -14,7 +14,7 @@ sourceCompatibility = 1.8
 
 group = 'org.opencadc'
 
-version = '1.3.7'
+version = '1.4.0'
 
 description = 'OpenCADC CDP client library'
 def git_url = 'https://github.com/opencadc/cdp'
@@ -23,12 +23,10 @@ mainClassName = 'ca.nrc.cadc.cred.client.Main'
 
 dependencies {
     compile 'xerces:xercesImpl:[2.12.1,3.0)'
-    compile 'org.bouncycastle:bcprov-jdk15on:1.46'
+    compile 'org.bouncycastle:bcprov-jdk18on:[1.70,2.0)'
+    compile 'org.bouncycastle:bcpkix-jdk18on:[1.70,2.0)'
 
-    // after 1.46, openssl package moved to bcpkix
-    //compile 'org.bouncycastle:bcpkix-jdk15on:1.70'
-
-    compile 'org.opencadc:cadc-util:[1.6,)'
+    compile 'org.opencadc:cadc-util:[1.11,)'
     compile 'org.opencadc:cadc-registry:[1.4,)'
     
     testCompile 'junit:junit:[4.13,5.0)'

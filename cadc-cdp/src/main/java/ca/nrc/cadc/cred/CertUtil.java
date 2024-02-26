@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2020.                            (c) 2020.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -80,6 +80,7 @@ import java.security.PrivateKey;
 import java.security.Security;
 import java.security.SignatureException;
 import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
@@ -87,35 +88,49 @@ import java.security.cert.X509Certificate;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.List;
 import java.util.Random;
 import java.util.TimeZone;
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 import javax.security.auth.x500.X500Principal;
+import org.apache.log4j.Logger;
 import org.bouncycastle.asn1.ASN1EncodableVector;
-import org.bouncycastle.asn1.DERObjectIdentifier;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.DERSequence;
-import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyUsage;
-import org.bouncycastle.asn1.x509.X509Extensions;
-import org.bouncycastle.jce.PKCS10CertificationRequest;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509ExtensionUtils;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMWriter;
-import org.bouncycastle.x509.X509V3CertificateGenerator;
-import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
-import org.bouncycastle.x509.extension.SubjectKeyIdentifierStructure;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.DigestCalculator;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.bc.BcDigestCalculatorProvider;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 /**
  * Utilities for certificate operations
  */
-public class CertUtil
-{
+public class CertUtil {
+    private static final Logger log = Logger.getLogger(CertUtil.class);
     
     public static final String DEFAULT_SIGNATURE_ALGORITHM = "SHA256WITHRSA";
-    
+
     public static final int DEFAULT_KEY_LENGTH = 2048;
 
     /**
      * Method that generates an X509 proxy certificate
-     * 
+     *
      * @param csr CSR for the certificate
      * @param lifetime lifetime of the certificate in SECONDS
      * @param chain certificate used to sign the proxy certificate
@@ -129,140 +144,124 @@ public class CertUtil
      * @throws CertificateNotYetValidException
      * @throws CertificateExpiredException
      */
-    public static X509Certificate generateCertificate(PKCS10CertificationRequest csr, 
-            int lifetime, X509CertificateChain chain) 
-        throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException,
+    public static X509Certificate generateCertificate(PKCS10CertificationRequest csr,
+            int lifetime, X509CertificateChain chain)
+            throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException,
             CertificateParsingException, CertificateEncodingException,
             SignatureException, CertificateExpiredException,
-            CertificateNotYetValidException
-    {
+            CertificateNotYetValidException {
+
         X509Certificate issuerCert = chain.getChain()[0];
-        PrivateKey issuerKey = chain.getPrivateKey();
-
+        final PrivateKey issuerKey = chain.getPrivateKey();
         Security.addProvider(new BouncyCastleProvider());
-
-        X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
-
-        certGen.setSerialNumber(BigInteger.valueOf(System
-                .currentTimeMillis()));
-        certGen.setIssuerDN(issuerCert.getSubjectX500Principal());
-
-        // generate the proxy DN as the issuerDN + CN=random number
+        
+        final BigInteger serial = BigInteger.valueOf(System.currentTimeMillis());
+        
+        // RFC1779: extra spaces between tuples, mixed case, order retained
+        // RFC2253: remove extra spaces, retain readable mixed case, order retained
+        // CANONICAL: RFC2253 + lower case
+        
+        // flipDN so CN is on the right: required by current cadc-cdp-server proxy cert issuing
+        final X500Name issuer = flipDN(issuerCert.getSubjectX500Principal().getName(X500Principal.RFC2253));
+        log.debug("issuer: " + issuer);
+        
+        // generate the proxy DN as the issuerDN with additional CN=random number
         Random rand = new Random();
-        String issuerDN = issuerCert.getSubjectX500Principal().getName(
-                X500Principal.RFC2253);
-        String delegDN = String.valueOf(Math.abs(rand.nextInt()));
-        String proxyDn = "CN=" + delegDN + "," + issuerDN;
-        certGen.setSubjectDN(new X500Principal(proxyDn));
-
-        // set validity
+        String delegCN = String.valueOf(Math.abs(rand.nextInt()));
+        final X500Name subject = new X500Name(issuer.toString() + ",CN=" + delegCN);
+        log.debug("subject: " + subject);
+        
+        // start date
         GregorianCalendar date = new GregorianCalendar(TimeZone.getTimeZone("GMT"));
         // Start date. Allow for a sixty five minute clock skew here.
         date.add(Calendar.MINUTE, -65);
         Date beforeDate = date.getTime();
-        for (X509Certificate currentCert : chain.getChain())
-        {
-            if (beforeDate.before(currentCert.getNotBefore()))
-            {
+        for (X509Certificate currentCert : chain.getChain()) {
+            if (beforeDate.before(currentCert.getNotBefore())) {
                 beforeDate = currentCert.getNotBefore();
             }
         }
-        certGen.setNotBefore(beforeDate);
 
-        // End date.
+        // end date
         // If hours = 0, then cert lifetime is set to that of user cert
-        if (lifetime <= 0)
-        {
+        date = new GregorianCalendar(TimeZone.getTimeZone("GMT"));
+        Date afterDate = date.getTime();
+        if (lifetime <= 0) {
             // set the validity of certificates as the minimum
             // of the certificates in the chain
-            Date afterDate = issuerCert.getNotAfter();
-            for (X509Certificate currentCert : chain.getChain())
-            {
-                if (afterDate.after(currentCert.getNotAfter()))
-                {
+            afterDate = issuerCert.getNotAfter();
+            for (X509Certificate currentCert : chain.getChain()) {
+                if (afterDate.after(currentCert.getNotAfter())) {
                     afterDate = currentCert.getNotAfter();
                 }
             }
-            certGen.setNotAfter(afterDate);
-        }
-        else
-        {
+        } else {
             // check the validity of the signing certificate
             date.add(Calendar.MINUTE, 5);
             date.add(Calendar.SECOND, lifetime);
-            for (X509Certificate currentCert : chain.getChain())
-            {
+            for (X509Certificate currentCert : chain.getChain()) {
                 currentCert.checkValidity(date.getTime());
             }
-
-            certGen.setNotAfter(date.getTime());
+            afterDate = date.getTime();
         }
 
-        certGen.setPublicKey(csr.getPublicKey());
-        // TODO: should be able to get signature algorithm from the csr, but... obtuse
-        certGen.setSignatureAlgorithm(DEFAULT_SIGNATURE_ALGORITHM);
+        log.debug("CSR: " + csr.getSubject());
+        X509v3CertificateBuilder certGen = new X509v3CertificateBuilder(issuer,
+                serial, beforeDate, afterDate, subject, csr.getSubjectPublicKeyInfo());
 
-        // extensions
-        // add ProxyCertInfo extension to the new cert
+        try {
+            // add ProxyCertInfo extension manually since BC 1.70+ does not have a suitable Extension.
+            ASN1EncodableVector policy = new ASN1EncodableVector();
+            policy.add(new ASN1ObjectIdentifier("1.3.6.1.5.5.7.21.1")); // IMPERSONATION aka proxy certificate
+            ASN1EncodableVector vec = new ASN1EncodableVector();
+            //policy.add(pathLengthConstr);
+            vec.add(new DERSequence(policy));
+            ASN1ObjectIdentifier extProxyCert = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.1.14");
+            certGen.addExtension(extProxyCert, true, new DERSequence(vec));
+            // end: ProxyCertInfo
+            
+            BcDigestCalculatorProvider dcp = new BcDigestCalculatorProvider();
+            DigestCalculator dc = dcp.get(new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1)); // RFC 5280
+            X509ExtensionUtils x509ext = new X509ExtensionUtils(dc);
 
-        certGen.addExtension(X509Extensions.KeyUsage, true, 
-            new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+            certGen.addExtension(Extension.keyUsage, false,
+                    new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment | KeyUsage.dataEncipherment).getEncoded());
 
-        certGen.addExtension(X509Extensions.AuthorityKeyIdentifier,
-            false, new AuthorityKeyIdentifierStructure(issuerCert));
+            certGen.addExtension(Extension.subjectKeyIdentifier, false, 
+                    x509ext.createSubjectKeyIdentifier(csr.getSubjectPublicKeyInfo()));
 
-        certGen.addExtension(X509Extensions.SubjectKeyIdentifier,
-            false, new SubjectKeyIdentifierStructure(csr.getPublicKey("BC")));
+            X509CertificateHolder issuerCH = new JcaX509CertificateHolder(issuerCert);
+            certGen.addExtension(Extension.authorityKeyIdentifier, false, x509ext.createAuthorityKeyIdentifier(issuerCH));
 
-        certGen.addExtension(X509Extensions.BasicConstraints, true,
-                new BasicConstraints(false));
-
-        // add the Proxy Certificate Information
-        // I expect this code to be removed once support to proxy
-        // certificates is provided in Bouncy Castle.
-
-        // create a proxy policy
-        // types of proxy certificate policies - see RFC3820
-        // impersonates the user
-        final DERObjectIdentifier IMPERSONATION = new DERObjectIdentifier(
-                "1.3.6.1.5.5.7.21.1");
-        // independent
-        // final DERObjectIdentifier INDEPENDENT = new
-        // DERObjectIdentifier(
-        // "1.3.6.1.5.5.7.21.2");
-        // defined by a policy language
-        // final DERObjectIdentifier LIMITED = new DERObjectIdentifier(
-        // "1.3.6.1.4.1.3536.1.1.1.9");
-
-        ASN1EncodableVector policy = new ASN1EncodableVector();
-        policy.add(IMPERSONATION);
-
-        // pathLengthConstr (RFC3820)
-        // The pCPathLenConstraint field, if present, specifies the
-        // maximum
-        // depth of the path of Proxy Certificates that can be signed by
-        // this
-        // Proxy Certificate. A pCPathLenConstraint of 0 means that this
-        // certificate MUST NOT be used to sign a Proxy Certificate. If
-        // the
-        // pCPathLenConstraint field is not present then the maximum proxy
-        // path
-        // length is unlimited. End entity certificates have unlimited
-        // maximum
-        // proxy path lengths.
-        // DERInteger pathLengthConstr = new DERInteger(100);
-
-        // create the proxy certificate information
-        ASN1EncodableVector vec = new ASN1EncodableVector();
-        // policy.add(pathLengthConstr);
-        vec.add(new DERSequence(policy));
-
-        // OID
-        final DERObjectIdentifier OID = new DERObjectIdentifier(
-                "1.3.6.1.5.5.7.1.14");
-        certGen.addExtension(OID, true, new DERSequence(vec));
-
-        return certGen.generate(issuerKey, "BC");
+            //certGen.addExtension(Extension.basicConstraints, true, new BasicConstraints(false).getEncoded());
+        } catch (IOException | OperatorCreationException ex) {
+            throw new RuntimeException("failed to add X509 extensions", ex);
+        }
+        
+        try {
+            ContentSigner signer = new JcaContentSignerBuilder(DEFAULT_SIGNATURE_ALGORITHM).setProvider("BC").build(issuerKey);
+            JcaX509CertificateConverter converter = new JcaX509CertificateConverter().setProvider("BC");
+        
+            return converter.getCertificate(certGen.build(signer));
+        } catch (CertificateException | OperatorCreationException ex) {
+            throw new RuntimeException("failed to create+sign proxy cert", ex);
+        }
+    }
+    
+    private static X500Name flipDN(String sdn) {
+        try {
+            LdapName dn = new LdapName(sdn);
+            List<Rdn> rdns = dn.getRdns();
+            StringBuilder sb = new StringBuilder();
+            for (Rdn r : rdns) {
+                // writing in normal order is actually flipping LDAP order
+                sb.append(r.toString());
+                sb.append(",");
+            }
+            return new X500Name(sb.substring(0, sb.length() - 1)); // strip off comma-space
+        } catch (InvalidNameException ex) {
+            throw new RuntimeException("BUG: failed to flip DN", ex);
+        }
     }
 
     /**
@@ -272,23 +271,23 @@ public class CertUtil
      */
     public static void writePEMCertificateAndKey(
             X509CertificateChain chain, Writer writer)
-            throws IOException
-    {
-        if (chain == null)
+            throws IOException {
+        if (chain == null) {
             throw new IllegalArgumentException("Null certificate chain");
-        if (writer == null)
+        }
+        if (writer == null) {
             throw new IllegalArgumentException("Null writer");
+        }
 
-        PEMWriter pemWriter = new PEMWriter(writer);
+        JcaPEMWriter pemWriter = new JcaPEMWriter(writer);
         // write the first certificate first
         pemWriter.writeObject(chain.getChain()[0]);
         // then the key
         pemWriter.writeObject(chain.getPrivateKey());
         // and finally the rest of the certificates in the chain
-        for (int i = 1; i < chain.getChain().length; i++)
-        {
+        for (int i = 1; i < chain.getChain().length; i++) {
             pemWriter.writeObject(chain.getChain()[i]);
-        }        
+        }
         pemWriter.flush();
     }
 }
