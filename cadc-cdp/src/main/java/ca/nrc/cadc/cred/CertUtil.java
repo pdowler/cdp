@@ -156,17 +156,20 @@ public class CertUtil {
         Security.addProvider(new BouncyCastleProvider());
         
         final BigInteger serial = BigInteger.valueOf(System.currentTimeMillis());
-        final X500Name issuer = flipDN(issuerCert.getSubjectX500Principal().toString());
+        
+        // RFC1779: extra spaces between tuples, mixed case, order retained
+        // RFC2253: remove extra spaces, retain readable mixed case, order retained
+        // CANONICAL: RFC2253 + lower case
+        
+        // flipDN so CN is on the right: required by current cadc-cdp-server proxy cert issuing
+        final X500Name issuer = flipDN(issuerCert.getSubjectX500Principal().getName(X500Principal.RFC2253));
         log.debug("issuer: " + issuer);
         
         // generate the proxy DN as the issuerDN with additional CN=random number
         Random rand = new Random();
-        String issuerDN = issuerCert.getSubjectX500Principal().getName(X500Principal.RFC2253); // CN on the left
         String delegCN = String.valueOf(Math.abs(rand.nextInt()));
-        String proxyDN = "CN=" + delegCN + "," + issuerDN;
-        log.debug("proxyDN: " + proxyDN);
-        final X500Name subject = flipDN(proxyDN);
-        log.debug("x500name of subject: " + subject);
+        final X500Name subject = new X500Name(issuer.toString() + ",CN=" + delegCN);
+        log.debug("subject: " + subject);
         
         // start date
         GregorianCalendar date = new GregorianCalendar(TimeZone.getTimeZone("GMT"));
@@ -202,6 +205,7 @@ public class CertUtil {
             afterDate = date.getTime();
         }
 
+        log.debug("CSR: " + csr.getSubject());
         X509v3CertificateBuilder certGen = new X509v3CertificateBuilder(issuer,
                 serial, beforeDate, afterDate, subject, csr.getSubjectPublicKeyInfo());
 
