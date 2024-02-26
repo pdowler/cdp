@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2011.                            (c) 2011.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -254,8 +254,6 @@ public class CredClient {
             CertificateEncodingException, CertificateParsingException,
             CertificateExpiredException, CertificateNotYetValidException, ResourceNotFoundException {
         final StringBuilder resourcePath = new StringBuilder(64);
-        // user does not have the group created. Through a POST.
-        // the server generates one and returns it to the user
         if (userDN != null) {
             resourcePath.append("?DN=");
             resourcePath.append(URLEncoder.encode(userDN.getName(),
