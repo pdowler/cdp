@@ -18,9 +18,19 @@ org.opencadc.cred.url=jdbc:postgresql://{server}/{database}
 ```
 
 The `cred` account owns and manages (create, alter, drop) inventory database objects and manages
-all the content (insert, update, delete). The database is specified in the JDBC URL and the schema name is specified 
-in the minoc.properties (below). Failure to connect or initialize the database will show up in logs and in the 
-VOSI-availability output.
+all the content (insert, update, delete). The database is specified in the JDBC URL and the schema 
+name is specified in the minoc.properties (below). Failure to connect or initialize the database 
+will show up in logs and in the VOSI-availability output.
+
+See <a href="https://github.com/opencadc/docker-base/tree/master/cadc-tomcat">cadc-tomcat</a>
+for system properties related to the deployment environment.
+
+See <a href="https://github.com/opencadc/core/tree/master/cadc-util">cadc-util</a>
+for common system properties.
+
+`dap` includes multiple IdentityManager implementations to support authenticated access:
+ - See <a href="https://github.com/opencadc/ac/tree/master/cadc-access-control-identity">cadc-access-control-identity</a> for CADC access-control system support.
+ - See <a href="https://github.com/opencadc/ac/tree/master/cadc-gms">cadc-gms</a> for OIDC token support.
 
 ### cred.properties
 
@@ -48,24 +58,18 @@ org.opencadc.cred.proxy.allowedUser = cn=alt,ou=acme,o=example,c=com
 org.opencadc.cred.proxy.maxDaysValid = 0.5
 ```
 
-### cred-logControl.properties
+### cadc-log.properties (optional)
+See <a href="https://github.com/opencadc/core/tree/master/cadc-log">cadc-log</a> for common 
+dynamic logging control.
 
+### cadc-vosi.properties (optional)
+See <a href="https://github.com/opencadc/reg/tree/master/cadc-vosi">cadc-vosi</a> for common 
+service state control.
 
-## integration testing
-
-A client certificates named `cred-test.pem` must exist in the directory $A/test-certificates.
-This can be a normal user certificate (or proxy) and is used to delegate (itself) to the cred service (the 
-normal use of CDP).
-
-A client certificate named `cred-test-super.pem` must exist in the directory $A/test-certificates and the 
-distinguished name must be configured as an `org.opencadc.cred.proxy.allowedUser`. This is used to test that
-a special operational user can retrieve a proxy cert for another user.
-
-There is currently no test for `org.opencadc.cred.delegate.allowedUser` as that requires a CA cert in the
-test environment and essentially the whole `cadc-cert-gen` functionality.
+### cadcproxy.pem (optional)
+This client certificate is used to make authenticated server-to-server calls for system-level A&A purposes.
 
 ## building
-
 ```
 gradle clean build
 docker build -t cred -f Dockerfile .
@@ -81,13 +85,4 @@ docker run -it cred:latest /bin/bash
 docker run --user tomcat:tomcat --volume=/path/to/external/config:/config:ro --name cred cred:latest
 ```
 
-## apply version tags
-```bash
-. VERSION && echo "tags: $TAGS" 
-for t in $TAGS; do
-   docker image tag cred:latest cred:$t
-done
-unset TAGS
-docker image list cred
-```
 

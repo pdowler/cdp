@@ -3,12 +3,12 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2022.                            (c) 2022.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
 *  All rights reserved                  Tous droits réservés
-*                                       
+*
 *  NRC disclaims any warranties,        Le CNRC dénie toute garantie
 *  expressed, implied, or               énoncée, implicite ou légale,
 *  statutory, of any kind with          de quelque nature que ce
@@ -31,10 +31,10 @@
 *  software without specific prior      de ce logiciel sans autorisation
 *  written permission.                  préalable et particulière
 *                                       par écrit.
-*                                       
+*
 *  This file is part of the             Ce fichier fait partie du projet
 *  OpenCADC project.                    OpenCADC.
-*                                       
+*
 *  OpenCADC is free software:           OpenCADC est un logiciel libre ;
 *  you can redistribute it and/or       vous pouvez le redistribuer ou le
 *  modify it under the terms of         modifier suivant les termes de
@@ -44,7 +44,7 @@
 *  either version 3 of the              : soit la version 3 de cette
 *  License, or (at your option)         licence, soit (à votre gré)
 *  any later version.                   toute version ultérieure.
-*                                       
+*
 *  OpenCADC is distributed in the       OpenCADC est distribué
 *  hope that it will be useful,         dans l’espoir qu’il vous
 *  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
@@ -54,7 +54,7 @@
 *  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
 *  General Public License for           Générale Publique GNU Affero
 *  more details.                        pour plus de détails.
-*                                       
+*
 *  You should have received             Vous devriez avoir reçu une
 *  a copy of the GNU Affero             copie de la Licence Générale
 *  General Public License along         Publique GNU Affero avec
@@ -62,27 +62,52 @@
 *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
 *                                       <http://www.gnu.org/licenses/>.
 *
-*  $Revision: 4 $
-*
 ************************************************************************
 */
 
-package org.opencadc.cred;
+package org.opencadc.cred.db;
 
-import ca.nrc.cadc.cred.server.CertificateDAO.CertificateSchema;
-import ca.nrc.cadc.cred.server.DatabaseDelegations;
+import ca.nrc.cadc.db.version.InitDatabase;
+import java.net.URL;
+import javax.sql.DataSource;
+import org.apache.log4j.Logger;
 
 /**
- * Implementation of the base Delegations API.
+ *
+ * @author pdowler
  */
-public class DelegationsImpl extends DatabaseDelegations
-{
-    public static final String DATASOURCE = "jdbc/cred";
-    public static final String CATALOG = null;
-    public static final String SCHEMA = "cred";
+public class InitDatabaseCDP extends InitDatabase {
+    private static final Logger log = Logger.getLogger(InitDatabaseCDP.class);
+    public static final String MODEL_NAME = "CDP";
+    public static final String MODEL_VERSION = "1.2";
+    public static final String PREV_MODEL_VERSION = "n/a";
+    //public static final String PREV_MODEL_VERSION = "DO-NOT_UPGRADE-BY-ACCIDENT";
     
-    public DelegationsImpl()
-    {
-        super(DATASOURCE, new CertificateSchema(DATASOURCE, CATALOG, SCHEMA));
+    static String[] CREATE_SQL = new String[] {
+        "cred.ModelVersion.sql",
+        "cred.X509CertificateChain.sql",
+        "cred.permissions.sql"
+    };
+            
+    static String[] UPGRADE_SQL = new String[] {
+        "cred.permissions.sql"
+    };
+    
+    public InitDatabaseCDP(DataSource ds, String database, String schema) { 
+        super(ds, database, schema, MODEL_NAME, MODEL_VERSION, PREV_MODEL_VERSION);
+        for (String s : CREATE_SQL) {
+            createSQL.add(s);
+        }
+        for (String s : UPGRADE_SQL) {
+            upgradeSQL.add(s);
+        }
     }
+
+    @Override
+    protected URL findSQL(String fname) {
+        // SQL files are stored inside the jar file
+        return InitDatabase.class.getClassLoader().getResource(fname);
+    }
+    
+    
 }
