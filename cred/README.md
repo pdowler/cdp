@@ -19,7 +19,7 @@ org.opencadc.cred.url=jdbc:postgresql://{server}/{database}
 
 The `cred` account owns and manages (create, alter, drop) inventory database objects and manages
 all the content (insert, update, delete). The database is specified in the JDBC URL and the schema 
-name is specified in the minoc.properties (below). Failure to connect or initialize the database 
+name is specified in the cred.properties (below). Failure to connect or initialize the database 
 will show up in logs and in the VOSI-availability output.
 
 See <a href="https://github.com/opencadc/docker-base/tree/master/cadc-tomcat">cadc-tomcat</a>
