@@ -2,65 +2,16 @@
     "swagger": "2.0",
     "info": {
         "version": "2.1.0",
-        "title": "Credential Delegation Service",
-        "description": "The credential delegation web service is used by CADC and CANFAR web services to perform secondary web service operations on behalf of the user. By default, it uses X509 certificates signed by CADC and recognized only within CADC and CANFAR, but the service also allows users to delegate their own certificates signed by other authorities.\n"
+        "title": "CADC Credential Service",
+        "description": "The credential web service is used to obtain user credentials in the form of certificates. These certificates are signed by the CADC and recognized only within the CADC and CANFAR\n"
     },
     "basePath": "/cred", 
     "paths": {
-        "/delegate": {
-            "post": {
-                "description": "Creates an identity resource (returned in 'location' response header) and a Certificate Signing Request (CSR) that is ready to use.\n",
-                "tags": [
-                    "Credential Delegation"
-                ],
-                "schemes": [
-                    "https"
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Successful response",
-                        "headers": {
-                            "Location": {
-                                "description": "Identity URL",
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized - User not authenticated"
-                    },
-                    "404": {
-                        "description": "Not Found - User not found"
-                    },
-                    "500": {
-                        "description": "Internal error"
-                    },
-                    "503": {
-                        "description": "Service busy"
-                    },
-                    "default": {
-                        "description": "Unexpeced error",
-                        "schema": {
-                            "$ref": "#/definitions/Error"
-                        }
-                    }
-                },
-                "parameters": [
-                    {
-                        "name": "DN",
-                        "in": "query",
-                        "description": "The distinguished name to delegate",
-                        "required": false,
-                        "type": "string"
-                    }
-                ]
-            }
-        },
-        "/delegate/{identity}/CSR": {
+        "/generate": {
             "get": {
-                "description": "Get the generated CSR for the identity.\n",
+                "description": "Generate a X509 certificate for the authenticated user,",
                 "tags": [
-                    "Credential Delegation"
+                    "X509 Certificate"
                 ],
                 "schemes": [
                     "https"
@@ -69,97 +20,7 @@
                     "200": {
                         "description": "Successful response",
                         "schema": {
-                            "title": "The CSR",
-                            "type": "file"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized - User not authenticated"
-                    },
-                    "404": {
-                        "description": "Not Found - User not found"
-                    },
-                    "500": {
-                        "description": "Internal error"
-                    },
-                    "503": {
-                        "description": "Service busy"
-                    },
-                    "default": {
-                        "description": "Unexpeced error",
-                        "schema": {
-                            "$ref": "#/definitions/Error"
-                        }
-                    }
-                },
-                "parameters": [
-                    {
-                        "name": "identity",
-                        "in": "path",
-                        "description": "The identity value from the Location header response from delegate POST",
-                        "required": true,
-                        "type": "string"
-                    }
-                ]
-            }
-        },
-        "/delegate/{identity}/certificate": {
-            "put": {
-                "description": "Upload the signed certificate.\n",
-                "tags": [
-                    "Credential Delegation"
-                ],
-                "schemes": [
-                    "https"
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Successful response"
-                    },
-                    "401": {
-                        "description": "Unauthorized - User not authenticated"
-                    },
-                    "404": {
-                        "description": "Not Found - User not found"
-                    },
-                    "500": {
-                        "description": "Internal error"
-                    },
-                    "503": {
-                        "description": "Service busy"
-                    },
-                    "default": {
-                        "description": "Unexpeced error",
-                        "schema": {
-                            "$ref": "#/definitions/Error"
-                        }
-                    }
-                },
-                "parameters": [
-                    {
-                        "name": "identity",
-                        "in": "path",
-                        "description": "The identity value from the Location header response from delegate POST",
-                        "required": true,
-                        "type": "string"
-                    }
-                ]
-            }
-        },
-        "/priv": {
-            "get": {
-                "description": "Get a proxy certificate for the authenticated user making the call. For users with their own (non-CADC) certificate, the user must have a valid delegated certificate in the system. Other users can simply retrieve a CADC-asigned proxy certificate.",
-                "tags": [
-                    "Proxy Certificate"
-                ],
-                "schemes": [
-                    "https"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful response",
-                        "schema": {
-                            "title": "The proxy certificate",
+                            "title": "The X509 certificate",
                             "type": "file"
                         }
                     },
@@ -194,11 +55,11 @@
                 ]
             }
         },
-        "/priv/dn/{X500-distinguished-name}": {
+        "/generate/dn/{X500-distinguished-name}": {
             "get": {
-                "description": "Get a proxy certificate for the specified user. Note: Only priviledged system users can get proxy certificates for anyone but themselves so this endpoint is not generally useful.\n",
+                "description": "Generate a X509 certificate for the specified user. Note: Only privileged system users can get proxy certificates for anyone but themselves so this endpoint is not generally useful.\n",
                 "tags": [
-                    "Proxy Certificate"
+                    "X509 Certificate"
                 ],
                 "schemes": [
                     "https"
@@ -207,7 +68,7 @@
                     "200": {
                         "description": "Successful response",
                         "schema": {
-                            "title": "The proxy certificate",
+                            "title": "The X509 certificate",
                             "type": "file"
                         }
                     },
@@ -224,7 +85,7 @@
                         "description": "Service busy"
                     },
                     "default": {
-                        "description": "Unexpeced error",
+                        "description": "Unexpected error",
                         "schema": {
                             "$ref": "#/definitions/Error"
                         }
@@ -251,9 +112,9 @@
         },
         "/priv/userid/{username}": {
             "get": {
-                "description": "Get a proxy certificate for the specified user.  Note: Only priviledged system users can get proxy certificates for anyone but themselves so this endpoint so this endpoint is not generally useful.",
+                "description": "Generate an X509 certificate for the specified user.  Note: Only privileged system users can get proxy certificates for anyone but themselves so this endpoint is not generally useful.",
                 "tags": [
-                    "Proxy Certificate"
+                    "X509 Certificate"
                 ],
                 "schemes": [
                     "https"
@@ -262,7 +123,7 @@
                     "200": {
                         "description": "Successful response",
                         "schema": {
-                            "title": "The proxy certificate",
+                            "title": "The X509 certificate",
                             "type": "file"
                         }
                     },
@@ -279,7 +140,7 @@
                         "description": "Service busy"
                     },
                     "default": {
-                        "description": "Unexpeced error",
+                        "description": "Unexpected error",
                         "schema": {
                             "$ref": "#/definitions/Error"
                         }

@@ -1,26 +1,18 @@
 # Credential Delegation Protocol service (cred)
 
 ## configuration
-See the <a href="https://github.com/opencadc/docker-base/tree/master/cadc-tomcat">cadc-tomcat</a> image docs 
-for expected deployment and general config requirements.
 
 The following configuration files must be available in the /config directory.
 
 ### catalina.properties
-When running cred.war in tomcat, parameters of the connection pool in META-INF/context.xml need
-to be configured in catalina.properties:
-```
-# database connection pools
-org.opencadc.cred.maxActive={max connections for cred admin pool}
-org.opencadc.cred.username={username for cred admin pool}
-org.opencadc.cred.password={password for cred admin pool}
-org.opencadc.cred.url=jdbc:postgresql://{server}/{database}
-```
+This file contains java system properties to configure the tomcat server and some of the java
+libraries used in the service.
 
-The `cred` account owns and manages (create, alter, drop) inventory database objects and manages
-all the content (insert, update, delete). The database is specified in the JDBC URL and the schema name is specified 
-in the minoc.properties (below). Failure to connect or initialize the database will show up in logs and in the 
-VOSI-availability output.
+See <a href="https://github.com/opencadc/docker-base/tree/master/cadc-tomcat">cadc-tomcat</a>
+for system properties related to the deployment environment.
+
+See <a href="https://github.com/opencadc/core/tree/master/cadc-util">cadc-util</a>
+for common system properties.
 
 ### cred.properties
 
@@ -48,7 +40,9 @@ org.opencadc.cred.proxy.allowedUser = cn=alt,ou=acme,o=example,c=com
 org.opencadc.cred.proxy.maxDaysValid = 0.5
 ```
 
-### cred-logControl.properties
+### cadc-log.properties (optional)
+See <a href="https://github.com/opencadc/core/tree/master/cadc-log">cadc-log</a> for common
+dynamic logging control.
 
 
 ## integration testing

@@ -69,7 +69,6 @@
 
 package org.opencadc.cred;
 
-import ca.nrc.cadc.cred.server.CertificateDAO;
 import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
 
@@ -92,16 +91,7 @@ public class ServiceAvailability implements AvailabilityPlugin {
     public Availability getStatus() {
         boolean isGood = true;
         String note = "service is accepting requests";
-        try {
-            CertificateDAO.CertificateSchema config = new CertificateDAO.CertificateSchema(
-                    DelegationsImpl.DATASOURCE, DelegationsImpl.CATALOG, DelegationsImpl.SCHEMA);
-            CertificateDAO dao = new CertificateDAO(config);
-            dao.exists("no-such-key");
-        } catch (Throwable t) {
-            // the test itself failed
-            isGood = false;
-            note = "test failed, reason: " + t;
-        }
+        // TBD
         return new Availability(isGood, note);
     }
 
