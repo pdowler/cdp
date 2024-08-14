@@ -69,6 +69,7 @@ package org.opencadc.cred;
 
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.DNPrincipal;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.SSLUtil;
@@ -173,14 +174,19 @@ public class GetCertAction extends RestAction {
             log.debug("User ID path " + path);
             Principal delegatedUser = getPrincipal(path);
             if (config.superUsers.contains(callerDN)) {
-                Subject delegatedSub = new Subject();
-                delegatedSub.getPrincipals().add(delegatedUser);
-                AuthenticationUtil.augmentSubject(delegatedSub);
-                dnPrincipals = delegatedSub.getPrincipals(X500Principal.class);
-                if (dnPrincipals.size() != 1) {
-                    throw new NotAuthenticatedException("User not found: " + delegatedUser);
+                if (delegatedUser instanceof X500Principal) {
+                    // no need for augment subject
+                    userDN = (X500Principal)delegatedUser;
+                } else {
+                    Subject delegatedSub = new Subject();
+                    delegatedSub.getPrincipals().add(delegatedUser);
+                    AuthenticationUtil.augmentSubject(delegatedSub);
+                    dnPrincipals = delegatedSub.getPrincipals(X500Principal.class);
+                    if (dnPrincipals.size() != 1) {
+                        throw new NotAuthenticatedException("User not found: " + delegatedUser);
+                    }
+                    userDN = dnPrincipals.iterator().next();
                 }
-                userDN = dnPrincipals.iterator().next();
             } else {
                 throw new AccessControlException("Not a superuser: " + callerDN);
             }

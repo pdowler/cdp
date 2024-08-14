@@ -222,6 +222,18 @@ public class GetCertTest
         chain = SSLUtil.readPemCertificateAndKey(certificate);
         log.debug("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
         verifyCert(chain, userID);
+
+        // get a cert for a made up DN
+        userDN = "C=ca,O=someorg,CN=user";
+        bos = new ByteArrayOutputStream();
+        get = new HttpGet(new URL(credUrl + "/dn/" + userDN), bos);
+        get.setRequestProperty("authorization", "bearer " + cadcToken);
+        get.run();
+        certificate = bos.toByteArray();
+        chain = SSLUtil.readPemCertificateAndKey(certificate);
+        Assert.assertEquals(userDN, chain.getChain()[0].getSubjectX500Principal().getName());
+        // it will not verify as the user is made up
+
     }
 
     @Test
