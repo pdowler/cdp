@@ -105,14 +105,14 @@ import org.apache.log4j.Logger;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
-import org.bouncycastle.asn1.x509.X509Extension;
-import org.bouncycastle.asn1.x509.X509Extensions;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.openssl.PEMWriter;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
@@ -214,7 +214,7 @@ public class GetCertAction extends RestAction {
 
         setResponseHeaders();
         // write new certificate, new certificate private key, signing cert chain
-        PEMWriter pw = new PEMWriter(new OutputStreamWriter(syncOutput.getOutputStream()));
+        JcaPEMWriter pw = new JcaPEMWriter(new OutputStreamWriter(syncOutput.getOutputStream()));
         pw.writeObject(cert);
         pw.writeObject(keyPair.getPrivate());
         for (X509Certificate x509Certificate : signer.getChain()) {
@@ -296,13 +296,14 @@ public class GetCertAction extends RestAction {
         // extensions
         //
         JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
-        v3CertBldr.addExtension(X509Extension.basicConstraints, true, new BasicConstraints(false));
+        JcaX509ExtensionUtils utils = new JcaX509ExtensionUtils();
+        v3CertBldr.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
         v3CertBldr.addExtension(
                 Extension.subjectKeyIdentifier,
                 false,
                 extUtils.createSubjectKeyIdentifier(publicKey));
-        v3CertBldr.addExtension(X509Extensions.AuthorityKeyIdentifier, false,
-                new AuthorityKeyIdentifierStructure(signer.getChain()[0]));
+        v3CertBldr.addExtension(Extension.authorityKeyIdentifier, false,
+                utils.createAuthorityKeyIdentifier(signer.getChain()[0].getPublicKey()));
 
         log.debug("Generate certificate");
         JcaContentSignerBuilder signerBuilder = new JcaContentSignerBuilder(CertUtil.DEFAULT_SIGNATURE_ALGORITHM).setProvider("BC");
