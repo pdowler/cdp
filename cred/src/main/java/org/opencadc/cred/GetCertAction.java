@@ -67,6 +67,7 @@
 
 package org.opencadc.cred;
 
+import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
@@ -81,8 +82,12 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.math.BigInteger;
 import java.security.AccessControlException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
@@ -97,30 +102,34 @@ import javax.naming.InitialContext;
 import javax.security.auth.Subject;
 import javax.security.auth.x500.X500Principal;
 import org.apache.log4j.Logger;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x509.X509Extension;
+import org.bouncycastle.asn1.x509.X509Extensions;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.openssl.PEMWriter;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
 
 /**
- * Class to handle a generate request to a cred service
+ * Class to handle certificate generation requests
  * @author adriand
  */
 public class GetCertAction extends RestAction {
     protected static Logger log = Logger.getLogger(GetCertAction.class);
 
     static final String CERTIFICATE_CONTENT_TYPE = "application/x-pem-file";
-    static final String CERTIFICATE_FILENAME = "cadcproxy.pem";
+    static final String CERTIFICATE_FILENAME = "cadcproxy.pem"; // content disposition
 
     // CADC specific fields of the DN
     public static final String CADC_DN = "ou=cadc,o=hia,c=ca";
 
-    public static final String DEFAULT_SIGNATURE_ALGORITHM = "SHA256WITHRSA";
-
-    public static final int DEFAULT_KEY_LENGTH = 2048;
     private CredConfig config;
 
     public GetCertAction() {
@@ -133,7 +142,7 @@ public class GetCertAction extends RestAction {
     }
 
     @Override
-    public void initAction() throws Exception {
+    public void initAction() {
         String jndiConfigKey = super.appName + "-config";
         try {
             Context ctx = new InitialContext();
@@ -147,59 +156,81 @@ public class GetCertAction extends RestAction {
     public void doAction() throws Exception {
         // create a cert for a single user
         Subject caller = AuthenticationUtil.getCurrentSubject();
-        AuthenticationUtil.augmentSubject(caller);
+        String path = syncInput.getPath();
+        if (AuthMethod.CERT.equals(AuthenticationUtil.getAuthMethod(caller)) && !StringUtil.hasText(path)) {
+            throw new AccessControlException("Cert Authentication not allowed for cert renewal.");
+        }
         Set<X500Principal> dnPrincipals = caller.getPrincipals(X500Principal.class);
         if (dnPrincipals.size() != 1) {
-            throw new NotAuthenticatedException("Authentication required.");
+            throw new NotAuthenticatedException("Authentication required (caller DN not found).");
         }
         X500Principal callerDN = dnPrincipals.iterator().next();
 
-        String path = syncInput.getPath();
+
         X500Principal userDN = callerDN;
         if (StringUtil.hasText(path)) {
             path = path.replace("^/+", "").replace("/+$", "");
-            log.debug("Delegation " + path);
+            log.debug("User ID path " + path);
             Principal delegatedUser = getPrincipal(path);
-            if (config.delegators.contains(callerDN)) {
+            if (config.superUsers.contains(callerDN)) {
                 Subject delegatedSub = new Subject();
                 delegatedSub.getPrincipals().add(delegatedUser);
                 AuthenticationUtil.augmentSubject(delegatedSub);
                 dnPrincipals = delegatedSub.getPrincipals(X500Principal.class);
                 if (dnPrincipals.size() != 1) {
-                    throw new NotAuthenticatedException("Delegated user not found: " + delegatedUser);
+                    throw new NotAuthenticatedException("User not found: " + delegatedUser);
                 }
                 userDN = dnPrincipals.iterator().next();
             } else {
-                throw new AccessControlException("Caller not authorized to delegate certs: " + callerDN);
+                throw new AccessControlException("Not a superuser: " + callerDN);
             }
         }
-        float daysValid = config.proxyMaxDaysValid;
+        float daysValid = config.maxDaysValid;
         String daysValidStr = syncInput.getParameter("daysValid");
         log.debug("daysValid: " + daysValidStr);
 
         if (daysValidStr != null) {
             try {
                 daysValid = Float.parseFloat(daysValidStr);
-                if (daysValid > config.proxyMaxDaysValid) {
-                    throw new IllegalArgumentException("daysValid larger than maximum allowed: " + config.proxyMaxDaysValid);
+                if (daysValid > config.maxDaysValid) {
+                    throw new IllegalArgumentException("daysValid larger than maximum allowed: " + config.maxDaysValid);
                 }
             } catch (NumberFormatException ex) {
                 throw new IllegalArgumentException("daysValid is not a float: " + daysValidStr);
             }
         }
-        log.debug("About to create certificate for user with DN " + userDN.toString());
-        X509Certificate cert = generateCertificate(userDN, daysValid);
-        log.debug("New user DN: " + userDN.toString());
+        String canonizedDN = AuthenticationUtil.canonizeDistinguishedName(userDN.getName());
+        X500Name userName = new X500Name(canonizedDN);
 
-        syncOutput.setHeader("Content-Disposition", "inline; filename=\"" + CERTIFICATE_FILENAME + "\"");
-        syncOutput.setHeader("Content-Type", CERTIFICATE_CONTENT_TYPE);
-        syncOutput.setCode(200);
+        // Generate key pair
+        KeyPairGenerator rsaGenerator = KeyPairGenerator.getInstance("RSA");
+        SecureRandom random = new SecureRandom();
+        rsaGenerator.initialize(config.userKeySize, random);
+        KeyPair keyPair = rsaGenerator.generateKeyPair();
+
+        X509CertificateChain signer = SSLUtil.readPemCertificateAndKey(new File(config.signingCert));
+        log.debug("About to create certificate for user with DN " + userName);
+        X509Certificate cert = generateCertificate(userName, keyPair.getPublic(), signer, daysValid);
+
+        setResponseHeaders();
+        // write new certificate, new certificate private key, signing cert chain
         PEMWriter pw = new PEMWriter(new OutputStreamWriter(syncOutput.getOutputStream()));
         pw.writeObject(cert);
+        pw.writeObject(keyPair.getPrivate());
+        for (X509Certificate x509Certificate : signer.getChain()) {
+            pw.writeObject(x509Certificate);
+        }
         pw.flush();
     }
 
+    private void setResponseHeaders() {
+        syncOutput.setHeader("Content-Disposition", "inline; filename=\"" + CERTIFICATE_FILENAME + "\"");
+        syncOutput.setHeader("Content-Type", CERTIFICATE_CONTENT_TYPE);
+        syncOutput.setCode(200);
+    }
+
     private static Principal getPrincipal(String path) {
+        // extracts the dn or username identity from a path
         String[] parts = path.split("/");
         if (parts.length != 2) {
             throw new IllegalArgumentException("Invalid path " + path);
@@ -219,7 +250,7 @@ public class GetCertAction extends RestAction {
      * Generates a certificate signed with subject's credentials (CADC private
      * key) and returns it.
      *
-     * @param userDN The X500Principal to generate for.
+     * @param user The X500Name to generate for.
      * @param daysValid Days the certificate will be valid for
      * @return X509CertificateChain generated and signed certificate chain
      * @throws NoSuchAlgorithmException
@@ -227,20 +258,20 @@ public class GetCertAction extends RestAction {
      * @throws CertificateException
      * @throws CertificateNotYetValidException
      * @throws CertificateExpiredException
+     * @throws IOException
      */
-    private X509Certificate generateCertificate(final X500Principal userDN, float daysValid)
+    private X509Certificate generateCertificate(final X500Name user, PublicKey publicKey, X509CertificateChain signer, float daysValid)
             throws NoSuchAlgorithmException,
             IllegalStateException, CertificateException,
-            OperatorCreationException, InvalidKeySpecException, IOException {
+            OperatorCreationException, IOException {
 
-        String canonizedDN = AuthenticationUtil.canonizeDistinguishedName(userDN.getName());
 
-//        if (!canonizedDN.contains(CADC_DN))
-//        {
-//            // TODO is this needed or it can work with delegated certs?
-//            throw new IllegalArgumentException(
-//                    "Wrong o, ou, or c fields in user DN: " + userDN);
-//        }
+        // enforce this or not?
+        //        if (!canonizedDN.contains(CADC_DN))
+        //        {
+        //            throw new IllegalArgumentException(
+        //                    "Wrong o, ou, or c fields in user DN: " + userDN);
+        //        }
 
         // set validity
         GregorianCalendar notBeforeDate = new GregorianCalendar(TimeZone.getTimeZone("GMT"));
@@ -251,30 +282,32 @@ public class GetCertAction extends RestAction {
         //
         // create the certificate - version 3
         //
-        X509CertificateChain signer = SSLUtil.readPemCertificateAndKey(new File(config.signingCert));
-        log.debug("Create cert for user " + canonizedDN + " signed by " + signer.getX500Principal());
-        X509v3CertificateBuilder v3CertBldr = new JcaX509v3CertificateBuilder(
-                signer.getX500Principal(),
+        X500Principal signerUser = signer.getChain()[0].getSubjectX500Principal();
+        log.debug("Create cert for user " + user + " signed by " + signerUser);
+        X509v3CertificateBuilder v3CertBldr = new X509v3CertificateBuilder(
+                X500Name.getInstance(signerUser.getEncoded()),
                 BigInteger.valueOf(System.currentTimeMillis()).multiply(BigInteger.valueOf(100)),
                 notBeforeDate.getTime(),
                 notAfterDate.getTime(),
-                new X500Principal(canonizedDN), signer.getEndEntity().getPublicKey());
+                user,
+                SubjectPublicKeyInfo.getInstance(publicKey.getEncoded()));
 
         //
         // extensions
         //
         JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
+        v3CertBldr.addExtension(X509Extension.basicConstraints, true, new BasicConstraints(false));
+        v3CertBldr.addExtension(
+                Extension.subjectKeyIdentifier,
+                false,
+                extUtils.createSubjectKeyIdentifier(publicKey));
+        v3CertBldr.addExtension(X509Extensions.AuthorityKeyIdentifier, false,
+                new AuthorityKeyIdentifierStructure(signer.getChain()[0]));
 
-//        v3CertBldr.addExtension(
-//                Extension.subjectKeyIdentifier,
-//                false,
-//                extUtils.createSubjectKeyIdentifier(eePublicKey));
-//        certGen.addExtension(X509Extensions.AuthorityKeyIdentifier, false,
-//                new AuthorityKeyIdentifierStructure(signer.getChain()[0]));
-        // no extensions, at least for now
         log.debug("Generate certificate");
         JcaContentSignerBuilder signerBuilder = new JcaContentSignerBuilder(CertUtil.DEFAULT_SIGNATURE_ALGORITHM).setProvider("BC");
+        X509CertificateHolder ch = v3CertBldr.build(signerBuilder.build(signer.getPrivateKey()));
 
-        return new JcaX509CertificateConverter().getCertificate(v3CertBldr.build(signerBuilder.build(signer.getPrivateKey())));
+        return new JcaX509CertificateConverter().getCertificate(ch);
     }
 }

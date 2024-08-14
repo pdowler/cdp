@@ -19,14 +19,14 @@ for common system properties.
 The configuration in cred.properties configures access to the service and some limits.
 
 ```
-# optional: users (one per line, multiple allowed) who are allowed to create certificates for other users
-org.opencadc.cred.delegate.allowedUser = {user identity}
-
 # users (one per line, multiple allowed) who are allowed to get certificates for other users
-org.opencadc.cred.proxy.allowedUser = {user identity}
+org.opencadc.cred.superUser = {user identity}
 
 # maximum lifetime (in days, floating point) of retrieved proxy certifciates
-org.opencadc.cred.proxy.maxDaysValid = {time in days}
+org.opencadc.cred.maxDaysValid = {time in days}
+
+# size of the generated RSA keys (2048, 4096 ...)
+org.opencadc.cred.userKeySize = {2048|4096|...}
 ```
 
 ### example cred.properties entry section:

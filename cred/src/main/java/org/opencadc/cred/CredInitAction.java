@@ -67,35 +67,25 @@
 
 package org.opencadc.cred;
 
-import ca.nrc.cadc.auth.DNPrincipal;
+import ca.nrc.cadc.auth.IdentityManager;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.rest.InitAction;
+import ca.nrc.cadc.util.InvalidConfigException;
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
 import ca.nrc.cadc.vosi.avail.CheckCertificate;
 import ca.nrc.cadc.vosi.avail.CheckException;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.security.KeyFactory;
-import java.security.KeyPair;
+import java.lang.reflect.InvocationTargetException;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.cert.CertificateException;
-import java.security.interfaces.RSAKey;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.security.auth.x500.X500Principal;
 import org.apache.log4j.Logger;
-import org.bouncycastle.util.io.pem.PemObject;
-import org.bouncycastle.util.io.pem.PemReader;
 
 /**
  * Validate config and put CredConfig object into JNDI and init the database
@@ -107,8 +97,9 @@ public class CredInitAction extends InitAction {
     private static final Logger log = Logger.getLogger(CredInitAction.class);
 
     private static final String CONFIG_FILE = "cred.properties";
-    private static final String MAX_VALID_PROP = "org.opencadc.cred.proxy.maxDaysValid";
-    private static final String DELEGATOR = "org.opencadc.cred.delegate.allowedUser";
+    private static final String MAX_VALID_PROP = "org.opencadc.cred.maxDaysValid";
+    private static final String SUPERUSER = "org.opencadc.cred.superUser";
+    private static final String USER_KEY_SIZE = "org.opencadc.cred.userKeySize";
 
     public static final File SIGN_CERT_FILE = new File("/config/signcert.pem");
 
@@ -119,6 +110,7 @@ public class CredInitAction extends InitAction {
 
     @Override
     public void doInit() {
+        initBasicAuthIdentityManager();
         initConfig();
     }
 
@@ -130,6 +122,25 @@ public class CredInitAction extends InitAction {
         } catch (NamingException ex) {
             log.debug("BUG: unable to unbind CredConfig with key " + jndiConfigKey, ex);
         }
+    }
+
+    private void initBasicAuthIdentityManager() {
+        String cname = System.getProperty(IdentityManager.class.getName());
+        if (cname != null) {
+            try {
+                Class c = Class.forName(cname);
+                IdentityManager o = (IdentityManager) c.getConstructor().newInstance();
+                // replace it with the BasicAuthIdentityManager
+                System.setProperty(IdentityManager.class.getName(), BasicAuthIdentityManager.class.getName());
+                System.setProperty(BasicAuthIdentityManager.class.getName(), cname);
+                log.debug("BasicAuthIndentityManager configured");
+            } catch (ClassNotFoundException
+                     | IllegalAccessException | IllegalArgumentException | InstantiationException
+                     | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
+                throw new InvalidConfigException("failed to load configured IdentityManager: " + cname, ex);
+            }
+        }
+
     }
     
     private void initConfig() {
@@ -148,13 +159,28 @@ public class CredInitAction extends InitAction {
                 if (maxDaysValid <= 0.0) {
                     throw new RuntimeException("CONFIG: invalid " + MAX_VALID_PROP + " = " + maxDaysValid + " -- must be positive");
                 }
-                credConfig.proxyMaxDaysValid = maxDaysValid;
+                credConfig.maxDaysValid = maxDaysValid;
             } catch (NumberFormatException ex) {
                 throw new RuntimeException("CONFIG: invalid " + MAX_VALID_PROP + " = " + smax, ex);
             }
         }
 
-        log.debug(MAX_VALID_PROP + " value: " + credConfig.proxyMaxDaysValid);
+        log.debug(MAX_VALID_PROP + " value: " + credConfig.maxDaysValid);
+
+        String ukey = mvp.getFirstPropertyValue(USER_KEY_SIZE);
+        if (ukey != null) {
+            try {
+                int userKeySize = Integer.parseInt(ukey);
+                if (userKeySize <= 1024) {
+                    throw new RuntimeException("CONFIG: invalid " + USER_KEY_SIZE + " = " + userKeySize + " -- must be greater than 1024");
+                }
+                credConfig.userKeySize = userKeySize;
+            } catch (NumberFormatException ex) {
+                throw new RuntimeException("CONFIG: invalid " + USER_KEY_SIZE + " = " + ukey, ex);
+            }
+        }
+
+        log.debug(USER_KEY_SIZE + " value: " + credConfig.userKeySize);
 
         if (SIGN_CERT_FILE.exists() && SIGN_CERT_FILE.canRead()) {
             CheckCertificate checkCert = new CheckCertificate(SIGN_CERT_FILE);
@@ -162,8 +188,7 @@ public class CredInitAction extends InitAction {
                 checkCert.check();
                 SSLUtil.readPemCertificateAndKey(SIGN_CERT_FILE);
                 credConfig.signingCert = SIGN_CERT_FILE.getAbsolutePath();
-            } catch (CheckException | CertificateException | InvalidKeySpecException | NoSuchAlgorithmException |
-                     IOException e) {
+            } catch (CheckException | CertificateException | InvalidKeySpecException | NoSuchAlgorithmException | IOException e) {
                 throw new RuntimeException("Invalid signing cert: " + SIGN_CERT_FILE.getPath(), e);
             }
         } else {
@@ -172,11 +197,11 @@ public class CredInitAction extends InitAction {
 
         log.debug("Signing cert: " + SIGN_CERT_FILE.getAbsolutePath());
 
-        for (String delegator : mvp.getProperty(DELEGATOR)) {
-            credConfig.delegators.add(new X500Principal(delegator));
+        for (String superuser : mvp.getProperty(SUPERUSER)) {
+            credConfig.superUsers.add(new X500Principal(superuser));
         }
 
-        log.debug("Added " + credConfig.delegators.size() + " allowed delegators");
+        log.debug("Added " + credConfig.superUsers.size() + " to superusers");
 
         try {
             Context initialContext = new InitialContext();

@@ -67,16 +67,10 @@
 
 package org.opencadc.cred;
 
-import ca.nrc.cadc.auth.DNPrincipal;
-import ca.nrc.cadc.auth.X509CertificateChain;
-import java.security.KeyPair;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import javax.security.auth.x500.X500Principal;
 import org.apache.log4j.Logger;
-import org.bouncycastle.crypto.Signer;
 
 /**
  * Configuration object that is created at startup and stored in JNDI for use
@@ -87,19 +81,21 @@ import org.bouncycastle.crypto.Signer;
 public class CredConfig {
     private static final Logger log = Logger.getLogger(CredConfig.class);
 
-    public float proxyMaxDaysValid = 30.0f;
+    public float maxDaysValid = 30.0f;
 
     public String signingCert;
+
+    public int userKeySize = 4096;
     
     public CredConfig() { 
     }
 
-    Set<X500Principal> delegators = new HashSet<>();
+    Set<X500Principal> superUsers = new HashSet<>();
 
     @Override
     public String toString() {
         return CredConfig.class.getName() + "[" 
-                + "proxyMaxDaysValid=" + proxyMaxDaysValid + "]";
+                + "maxDaysValid=" + maxDaysValid + ", signingCert=" + signingCert + ", userKeySize=" + userKeySize + "]";
     }
     
     

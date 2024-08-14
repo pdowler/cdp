@@ -3,7 +3,7 @@
     "info": {
         "version": "2.1.0",
         "title": "CADC Credential Service",
-        "description": "The credential web service is used to obtain user credentials in the form of certificates. These certificates are signed by the CADC and recognized only within the CADC and CANFAR\n"
+        "description": "The credential web service is used to exchange user credentials for short-lived X500 certificates. These certificates are signed by the CADC and recognized only within the CADC and CANFAR\n"
     },
     "basePath": "/cred", 
     "paths": {

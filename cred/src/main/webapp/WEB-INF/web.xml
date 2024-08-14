@@ -167,7 +167,7 @@
     <servlet-name>GenerateServlet</servlet-name>
     <url-pattern>/generate/*</url-pattern>
   </servlet-mapping>
-  
+
   <!--
     The Capabilities service.
   -->
@@ -191,17 +191,5 @@
       <servlet-name>logControl</servlet-name>
       <url-pattern>/logControl</url-pattern>
   </servlet-mapping>
-
-
-    <!-- here for compatibility: this thing just forwards to /auth/priv
-   <servlet>
-     <servlet-name>ProxyCertServlet</servlet-name>
-     <servlet-class>org.opencadc.cred.ProxyCertServlet</servlet-class>
-   </servlet>
-   <servlet-mapping>
-     <servlet-name>ProxyCertServlet</servlet-name>
-     <url-pattern>/proxyCert</url-pattern>
-   </servlet-mapping>
-   -->
 
 </web-app>
