@@ -110,7 +110,7 @@
                 ]
             }
         },
-        "/priv/userid/{username}": {
+        "/generate/userid/{username}": {
             "get": {
                 "description": "Generate an X509 certificate for the specified user.  Note: Only privileged system users can get proxy certificates for anyone but themselves so this endpoint is not generally useful.",
                 "tags": [
