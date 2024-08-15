@@ -91,7 +91,6 @@ public class ServiceAvailability implements AvailabilityPlugin {
     public Availability getStatus() {
         boolean isGood = true;
         String note = "service is accepting requests";
-        // TBD
         return new Availability(isGood, note);
     }
 

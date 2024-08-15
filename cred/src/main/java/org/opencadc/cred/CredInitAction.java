@@ -103,7 +103,7 @@ public class CredInitAction extends InitAction {
 
     public static final File SIGN_CERT_FILE = new File("/config/signcert.pem");
 
-    private String jndiConfigKey;
+    private String jndiKey;
 
     public CredInitAction() {
     }
@@ -111,6 +111,7 @@ public class CredInitAction extends InitAction {
     @Override
     public void doInit() {
         initBasicAuthIdentityManager();
+        this.jndiKey = super.appName + "." + CredConfig.class.getSimpleName();
         initConfig();
     }
 
@@ -118,9 +119,9 @@ public class CredInitAction extends InitAction {
     public void doShutdown() {
         try {
             Context initialContext = new InitialContext();
-            initialContext.unbind(jndiConfigKey);
+            initialContext.unbind(jndiKey);
         } catch (NamingException ex) {
-            log.debug("BUG: unable to unbind CredConfig with key " + jndiConfigKey, ex);
+            log.debug("BUG: unable to unbind CredConfig with key " + jndiKey, ex);
         }
     }
 
@@ -144,7 +145,6 @@ public class CredInitAction extends InitAction {
     }
     
     private void initConfig() {
-        jndiConfigKey = super.appName + "-config";
         CredConfig credConfig = new CredConfig();
         PropertiesReader pr = new PropertiesReader(CONFIG_FILE);
         MultiValuedProperties mvp = pr.getAllProperties();
@@ -205,9 +205,9 @@ public class CredInitAction extends InitAction {
 
         try {
             Context initialContext = new InitialContext();
-            initialContext.bind(jndiConfigKey, credConfig);
+            initialContext.bind(jndiKey, credConfig);
         } catch (NamingException ex) {
-            throw new IllegalStateException("BUG: unable to bind CredConfig to key " + jndiConfigKey, ex);
+            throw new IllegalStateException("BUG: unable to bind CredConfig to key " + jndiKey, ex);
         }
     }
 }

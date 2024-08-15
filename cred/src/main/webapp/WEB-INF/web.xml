@@ -108,6 +108,44 @@
         <load-on-startup>1</load-on-startup>
       </servlet>
 
+  <!-- temporary invisible init servlet until we port core delegation servlet to cadc-rest -->
+  <servlet>
+      <servlet-name>CertGenServlet</servlet-name>
+        <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
+        <init-param>
+            <param-name>init</param-name>
+            <param-value>org.opencadc.cred.CredInitAction</param-value>
+        </init-param>
+        
+        <init-param>
+            <param-name>get</param-name>
+            <param-value>org.opencadc.cred.GetCertAction</param-value>
+        </init-param>
+        <load-on-startup>2</load-on-startup>
+  </servlet>
+  
+  <servlet>
+      <servlet-name>CapabilitiesServlet</servlet-name>
+        <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
+        <init-param>
+            <param-name>init</param-name>
+            <param-value>ca.nrc.cadc.vosi.CapInitAction</param-value>
+        </init-param>
+        <init-param>
+            <param-name>get</param-name>
+            <param-value>ca.nrc.cadc.vosi.CapGetAction</param-value>
+        </init-param>
+        <init-param>
+            <param-name>head</param-name>
+            <param-value>ca.nrc.cadc.vosi.CapHeadAction</param-value>
+        </init-param>
+        <init-param>
+            <param-name>input</param-name>
+            <param-value>/capabilities.xml</param-value>
+        </init-param>
+      <load-on-startup>3</load-on-startup>
+  </servlet>
+
   <servlet>
     <servlet-name>AvailabilityServlet</servlet-name>
     <servlet-class>ca.nrc.cadc.vosi.AvailabilityServlet</servlet-class>
@@ -119,52 +157,11 @@
     <load-on-startup>2</load-on-startup>
   </servlet>
 
-  <!-- VOSI capabilities -->
-  <servlet>
-    <servlet-name>CapabilitiesServlet</servlet-name>
-    <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
-    <init-param>
-      <param-name>init</param-name>
-      <param-value>ca.nrc.cadc.vosi.CapInitAction</param-value>
-    </init-param>
-    <init-param>
-      <param-name>head</param-name>
-      <param-value>ca.nrc.cadc.vosi.CapHeadAction</param-value>
-    </init-param>
-    <init-param>
-      <param-name>get</param-name>
-      <param-value>ca.nrc.cadc.vosi.CapGetAction</param-value>
-    </init-param>
-    <init-param>
-      <param-name>input</param-name>
-      <param-value>/capabilities.xml</param-value>
-    </init-param>
-    <load-on-startup>2</load-on-startup>
-  </servlet>
-
-  <servlet>
-    <servlet-name>GenerateServlet</servlet-name>
-    <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
-    <init-param>
-      <param-name>augmentSubject</param-name>
-      <param-value>true</param-value>
-    </init-param>
-    <init-param>
-      <param-name>init</param-name>
-      <param-value>org.opencadc.cred.CredInitAction</param-value>
-    </init-param>
-    <init-param>
-      <param-name>get</param-name>
-      <param-value>org.opencadc.cred.GetCertAction</param-value>
-    </init-param>
-    <load-on-startup>3</load-on-startup>
-  </servlet>
-
   <!--
     The Cred Endpoints
   -->
   <servlet-mapping>
-    <servlet-name>GenerateServlet</servlet-name>
+    <servlet-name>CertGenServlet</servlet-name>
     <url-pattern>/generate/*</url-pattern>
   </servlet-mapping>
 
@@ -176,20 +173,13 @@
       <url-pattern>/capabilities</url-pattern>
   </servlet-mapping>
 
-  <!--
-    The Availability service.
-  -->
   <servlet-mapping>
     <servlet-name>AvailabilityServlet</servlet-name>
     <url-pattern>/availability</url-pattern>
   </servlet-mapping>
   
-  <!-- 
-    The Log service
-  -->
   <servlet-mapping>
       <servlet-name>logControl</servlet-name>
       <url-pattern>/logControl</url-pattern>
   </servlet-mapping>
-
 </web-app>

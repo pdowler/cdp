@@ -86,7 +86,7 @@ public class CredConfig {
     public String signingCert;
 
     public int userKeySize = 4096;
-    
+
     public CredConfig() { 
     }
 
@@ -97,6 +97,4 @@ public class CredConfig {
         return CredConfig.class.getName() + "[" 
                 + "maxDaysValid=" + maxDaysValid + ", signingCert=" + signingCert + ", userKeySize=" + userKeySize + "]";
     }
-    
-    
 }

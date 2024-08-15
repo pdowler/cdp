@@ -41,25 +41,17 @@ org.opencadc.cred.proxy.maxDaysValid = 0.5
 ```
 
 ### cadc-log.properties (optional)
-See <a href="https://github.com/opencadc/core/tree/master/cadc-log">cadc-log</a> for common
+See <a href="https://github.com/opencadc/core/tree/master/cadc-log">cadc-log</a> for common 
 dynamic logging control.
 
+### cadc-vosi.properties (optional)
+See <a href="https://github.com/opencadc/reg/tree/master/cadc-vosi">cadc-vosi</a> for common 
+service state control.
 
-## integration testing
-
-A client certificates named `cred-test.pem` must exist in the directory $A/test-certificates.
-This can be a normal user certificate (or proxy) and is used to delegate (itself) to the cred service (the 
-normal use of CDP).
-
-A client certificate named `cred-test-super.pem` must exist in the directory $A/test-certificates and the 
-distinguished name must be configured as an `org.opencadc.cred.proxy.allowedUser`. This is used to test that
-a special operational user can retrieve a proxy cert for another user.
-
-There is currently no test for `org.opencadc.cred.delegate.allowedUser` as that requires a CA cert in the
-test environment and essentially the whole `cadc-cert-gen` functionality.
+### cadcproxy.pem (optional)
+This client certificate is used to make authenticated server-to-server calls for system-level A&A purposes.
 
 ## building
-
 ```
 gradle clean build
 docker build -t cred -f Dockerfile .
@@ -75,13 +67,4 @@ docker run -it cred:latest /bin/bash
 docker run --user tomcat:tomcat --volume=/path/to/external/config:/config:ro --name cred cred:latest
 ```
 
-## apply version tags
-```bash
-. VERSION && echo "tags: $TAGS" 
-for t in $TAGS; do
-   docker image tag cred:latest cred:$t
-done
-unset TAGS
-docker image list cred
-```
 
