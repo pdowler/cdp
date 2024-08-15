@@ -122,6 +122,7 @@ public class GetCertAction extends RestAction {
 
     static final String CERTIFICATE_CONTENT_TYPE = "application/x-pem-file";
     static final String CERTIFICATE_FILENAME = "cadcproxy.pem"; // content disposition
+    static final int CERT_KEY_SIZE = 2048;
 
     // CADC specific fields of the DN
     public static final String CADC_DN = "ou=cadc,o=hia,c=ca";
@@ -139,13 +140,7 @@ public class GetCertAction extends RestAction {
 
     @Override
     public void initAction() {
-        String jndiConfigKey =  super.appName + "." + CredConfig.class.getSimpleName();
-        try {
-            Context ctx = new InitialContext();
-            this.config = ((CredConfig) ctx.lookup(jndiConfigKey));
-        } catch (Exception oops) {
-            throw new RuntimeException("BUG: NodePersistence implementation not found with JNDI key " + jndiConfigKey, oops);
-        }
+        config = CredInitAction.getConfig(super.appName);
     }
 
     @Override
@@ -206,7 +201,7 @@ public class GetCertAction extends RestAction {
         // Generate key pair
         KeyPairGenerator rsaGenerator = KeyPairGenerator.getInstance("RSA");
         SecureRandom random = new SecureRandom();
-        rsaGenerator.initialize(config.userKeySize, random);
+        rsaGenerator.initialize(CERT_KEY_SIZE, random);
         KeyPair keyPair = rsaGenerator.generateKeyPair();
 
         X509CertificateChain signer = SSLUtil.readPemCertificateAndKey(new File(config.signingCert));

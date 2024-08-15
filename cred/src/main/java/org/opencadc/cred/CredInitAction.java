@@ -99,8 +99,6 @@ public class CredInitAction extends InitAction {
     private static final String CONFIG_FILE = "cred.properties";
     private static final String MAX_VALID_PROP = "org.opencadc.cred.maxDaysValid";
     private static final String SUPERUSER = "org.opencadc.cred.superUser";
-    private static final String USER_KEY_SIZE = "org.opencadc.cred.userKeySize";
-
     public static final File SIGN_CERT_FILE = new File("/config/signcert.pem");
 
     private String jndiKey;
@@ -111,7 +109,7 @@ public class CredInitAction extends InitAction {
     @Override
     public void doInit() {
         initBasicAuthIdentityManager();
-        this.jndiKey = super.appName + "." + CredConfig.class.getSimpleName();
+        this.jndiKey = getJndiKey(super.appName);
         initConfig();
     }
 
@@ -122,6 +120,20 @@ public class CredInitAction extends InitAction {
             initialContext.unbind(jndiKey);
         } catch (NamingException ex) {
             log.debug("BUG: unable to unbind CredConfig with key " + jndiKey, ex);
+        }
+    }
+
+    private static String getJndiKey(String appName) {
+        return appName + "." + CredConfig.class.getSimpleName();
+    }
+
+    public static CredConfig getConfig(String app) {
+        String jndiConfigKey = getJndiKey(app);
+        try {
+            Context ctx = new InitialContext();
+            return ((CredConfig) ctx.lookup(jndiConfigKey));
+        } catch (Exception oops) {
+            throw new RuntimeException("BUG: cred config not found. Service init failure?", oops);
         }
     }
 
@@ -166,21 +178,6 @@ public class CredInitAction extends InitAction {
         }
 
         log.debug(MAX_VALID_PROP + " value: " + credConfig.maxDaysValid);
-
-        String ukey = mvp.getFirstPropertyValue(USER_KEY_SIZE);
-        if (ukey != null) {
-            try {
-                int userKeySize = Integer.parseInt(ukey);
-                if (userKeySize <= 1024) {
-                    throw new RuntimeException("CONFIG: invalid " + USER_KEY_SIZE + " = " + userKeySize + " -- must be greater than 1024");
-                }
-                credConfig.userKeySize = userKeySize;
-            } catch (NumberFormatException ex) {
-                throw new RuntimeException("CONFIG: invalid " + USER_KEY_SIZE + " = " + ukey, ex);
-            }
-        }
-
-        log.debug(USER_KEY_SIZE + " value: " + credConfig.userKeySize);
 
         if (SIGN_CERT_FILE.exists() && SIGN_CERT_FILE.canRead()) {
             CheckCertificate checkCert = new CheckCertificate(SIGN_CERT_FILE);

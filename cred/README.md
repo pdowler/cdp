@@ -4,6 +4,17 @@
 
 The following configuration files must be available in the /config directory.
 
+### signcert.pem
+This is the signing certificate that contains both the X509 certificate and the private key 
+(without a passphrase) of the signing authority.
+
+### cadcproxy.pem
+Certificate used to augment subject.
+
+### RsaSignaturePub.key
+Public key used to decode the CADC tokens. While optional, its presence optimizes the execution by
+avoiding the augment subject call over the network.
+
 ### catalina.properties
 This file contains java system properties to configure the tomcat server and some of the java
 libraries used in the service.
@@ -25,17 +36,13 @@ org.opencadc.cred.superUser = {user identity}
 # maximum lifetime (in days, floating point) of retrieved proxy certifciates
 org.opencadc.cred.maxDaysValid = {time in days}
 
-# size of the generated RSA keys (2048, 4096 ...)
-org.opencadc.cred.userKeySize = {2048|4096|...}
+
 ```
 
 ### example cred.properties entry section:
 ```
-org.opencadc.cred.delegate.allowedUser = cn=generate,ou=acme,o=example,c=com 
-org.opencadc.cred.delegate.allowedUser = cn=alt,ou=acme,o=example,c=com
-
-org.opencadc.cred.proxy.allowedUser = cn=getproxy,ou=acme,o=example,c=com
-org.opencadc.cred.proxy.allowedUser = cn=alt,ou=acme,o=example,c=com
+org.opencadc.cred.superUser = cn=generate,ou=acme,o=example,c=com 
+org.opencadc.cred.superUser = cn=alt,ou=acme,o=example,c=com
 
 org.opencadc.cred.proxy.maxDaysValid = 0.5
 ```

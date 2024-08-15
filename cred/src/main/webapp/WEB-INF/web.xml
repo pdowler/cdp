@@ -101,10 +101,6 @@
                 ca.nrc.cadc.vosi
             </param-value>
         </init-param>
-        <init-param>
-            <param-name>logControlProperties</param-name>
-            <param-value>cred-logControl.properties</param-value>
-        </init-param>
         <load-on-startup>1</load-on-startup>
       </servlet>
 
@@ -154,7 +150,7 @@
       <param-name>ca.nrc.cadc.vosi.AvailabilityPlugin</param-name>
       <param-value>org.opencadc.cred.ServiceAvailability</param-value>
     </init-param>
-    <load-on-startup>2</load-on-startup>
+    <load-on-startup>3</load-on-startup>
   </servlet>
 
   <!--

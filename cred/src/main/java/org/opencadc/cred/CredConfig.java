@@ -85,9 +85,7 @@ public class CredConfig {
 
     public String signingCert;
 
-    public int userKeySize = 4096;
-
-    public CredConfig() { 
+    public CredConfig() {
     }
 
     Set<X500Principal> superUsers = new HashSet<>();
@@ -95,6 +93,6 @@ public class CredConfig {
     @Override
     public String toString() {
         return CredConfig.class.getName() + "[" 
-                + "maxDaysValid=" + maxDaysValid + ", signingCert=" + signingCert + ", userKeySize=" + userKeySize + "]";
+                + "maxDaysValid=" + maxDaysValid + ", signingCert=" + signingCert + "]";
     }
 }
