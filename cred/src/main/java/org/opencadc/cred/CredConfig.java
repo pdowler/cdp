@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2021.                            (c) 2021.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -67,111 +67,42 @@
 
 package org.opencadc.cred;
 
-import ca.nrc.cadc.db.DBUtil;
-import ca.nrc.cadc.rest.InitAction;
-import ca.nrc.cadc.util.MultiValuedProperties;
-import ca.nrc.cadc.util.PropertiesReader;
+import java.util.ArrayList;
 import java.util.List;
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.security.auth.x500.X500Principal;
-import javax.sql.DataSource;
 import org.apache.log4j.Logger;
-import org.opencadc.cred.db.InitDatabaseCDP;
 
 /**
- * Validate config and put CredConfig object into JNDI and init the database
- * (create or update tables).
+ * Configuration object that is created at startup and stored in JNDI for use
+ * by delegation and proxy servlets. 
  * 
  * @author pdowler
  */
-public class CredInitAction extends InitAction {
-    private static final Logger log = Logger.getLogger(CredInitAction.class);
+public class CredConfig {
+    private static final Logger log = Logger.getLogger(CredConfig.class);
 
-    private static final String CONFIG_FILE = "cred.properties";
-    private static final String DELEGATE_PROP  = "org.opencadc.cred.delegate.allowedUser";
-    private static final String PROXY_PROP     = "org.opencadc.cred.proxy.allowedUser";
-    private static final String MAX_VALID_PROP = "org.opencadc.cred.proxy.maxDaysValid";
+    private final List<X500Principal> delegateUsers = new ArrayList<>();
+    private final List<X500Principal> proxyUsers = new ArrayList<>();
+    public float proxyMaxDaysValid = 30.0f;
     
-    private String jndiKey;
-    private CredConfig credConfig;
-    
-    public CredInitAction() { 
+    public CredConfig() { 
     }
 
-    @Override
-    public void doInit() {
-        this.jndiKey = super.appName + "." + CredConfig.class.getSimpleName();
-        initConfig();
-        initDatabase();
+    public List<X500Principal> getDelegateUsers() {
+        return delegateUsers;
+    }
+
+    public List<X500Principal> getProxyUsers() {
+        return proxyUsers;
     }
 
     @Override
-    public void doShutdown() {
-        try {
-            Context initialContext = new InitialContext();
-            initialContext.unbind(jndiKey);
-        } catch (NamingException ex) {
-            log.debug("BUG: unable to unbind CredConfig with key " + jndiKey, ex);
-        }
+    public String toString() {
+        return CredConfig.class.getName() + "[" 
+                + "trusted=" + proxyUsers.size() + ","
+                + "su=" + delegateUsers.size() + ","
+                + "proxyMaxDaysValid=" + proxyMaxDaysValid + "]";
     }
     
-    private void initConfig() {
-        this.credConfig = new CredConfig();
-        PropertiesReader pr = new PropertiesReader(CONFIG_FILE);
-        MultiValuedProperties mvp = pr.getAllProperties();
-        if (mvp == null) {
-            throw new RuntimeException("CONFIG: not found: " + CONFIG_FILE);
-        }
-        
-        List<String> delegate = mvp.getProperty(DELEGATE_PROP);
-        if (delegate != null) {
-            for (String s : delegate) {
-                X500Principal p = new X500Principal(s);
-                credConfig.getDelegateUsers().add(p);
-            }
-        }
-        log.warn(DELEGATE_PROP + " found: " + credConfig.getDelegateUsers().size());
-        
-        List<String> proxy = mvp.getProperty(PROXY_PROP);
-        if (proxy != null) {
-            for (String s : proxy) {
-                X500Principal p = new X500Principal(s);
-                credConfig.getProxyUsers().add(p);
-            }
-        }
-        log.warn(PROXY_PROP + " found: " + credConfig.getProxyUsers().size());
-        
-        String smax = mvp.getFirstPropertyValue(MAX_VALID_PROP);
-        if (smax != null) {
-            try {
-                float maxDaysValid = Float.parseFloat(smax);
-                if (maxDaysValid <= 0.0) {
-                    throw new RuntimeException("CONFIG: invalid " + MAX_VALID_PROP + " = " + maxDaysValid + " -- must be positive");
-                }
-                credConfig.proxyMaxDaysValid = maxDaysValid;
-            } catch (NumberFormatException ex) {
-                throw new RuntimeException("CONFIG: invalid " + MAX_VALID_PROP + " = " + smax, ex);
-            }
-        }
-        log.warn(MAX_VALID_PROP + " value: " + credConfig.proxyMaxDaysValid);
-        
-        try {
-            Context initialContext = new InitialContext();
-            initialContext.bind(jndiKey, credConfig);
-        } catch (NamingException ex) {
-            throw new IllegalStateException("BUG: unablew to bind CredConfig to key " + jndiKey, ex);
-        }
-    }
     
-    private void initDatabase() {
-        try {
-            DataSource ds = DBUtil.findJNDIDataSource("jdbc/cred"); // context.xml
-            InitDatabaseCDP init = new InitDatabaseCDP(ds, null, "cred");
-            init.doInit();
-        } catch (NamingException ex) {
-            throw new RuntimeException("BUG: failed to find jdbc/cred", ex);
-        }
-    }
 }
