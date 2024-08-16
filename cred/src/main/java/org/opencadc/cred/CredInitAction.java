@@ -67,6 +67,7 @@
 
 package org.opencadc.cred;
 
+import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.IdentityManager;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.rest.InitAction;
@@ -99,7 +100,7 @@ public class CredInitAction extends InitAction {
     private static final String CONFIG_FILE = "cred.properties";
     private static final String MAX_VALID_PROP = "org.opencadc.cred.maxDaysValid";
     private static final String SUPERUSER = "org.opencadc.cred.superUser";
-    public static final File SIGN_CERT_FILE = new File("/config/signcert.pem");
+    public static final File SIGN_CERT_FILE = new File(System.getProperty("user.home") + "/.ssl/signcert.pem");
 
     private String jndiKey;
 
@@ -195,7 +196,7 @@ public class CredInitAction extends InitAction {
         log.debug("Signing cert: " + SIGN_CERT_FILE.getAbsolutePath());
 
         for (String superuser : mvp.getProperty(SUPERUSER)) {
-            credConfig.superUsers.add(new X500Principal(superuser));
+            credConfig.superUsers.add(new X500Principal(AuthenticationUtil.canonizeDistinguishedName(superuser)));
         }
 
         log.debug("Added " + credConfig.superUsers.size() + " to superusers");

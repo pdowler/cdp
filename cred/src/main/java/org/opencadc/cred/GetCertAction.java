@@ -74,6 +74,7 @@ import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.CertUtil;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.StringUtil;
@@ -89,15 +90,11 @@ import java.security.Principal;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.Set;
 import java.util.TimeZone;
-import javax.naming.Context;
-import javax.naming.InitialContext;
 import javax.security.auth.Subject;
 import javax.security.auth.x500.X500Principal;
 import org.apache.log4j.Logger;
@@ -124,9 +121,6 @@ public class GetCertAction extends RestAction {
     static final String CERTIFICATE_FILENAME = "cadcproxy.pem"; // content disposition
     static final int CERT_KEY_SIZE = 2048;
 
-    // CADC specific fields of the DN
-    public static final String CADC_DN = "ou=cadc,o=hia,c=ca";
-
     private CredConfig config;
 
     public GetCertAction() {
@@ -147,39 +141,46 @@ public class GetCertAction extends RestAction {
     public void doAction() throws Exception {
         // create a cert for a single user
         Subject caller = AuthenticationUtil.getCurrentSubject();
-        String path = syncInput.getPath();
-        if (AuthMethod.CERT.equals(AuthenticationUtil.getAuthMethod(caller)) && !StringUtil.hasText(path)) {
-            throw new AccessControlException("Cert Authentication not allowed for cert renewal.");
-        }
         Set<X500Principal> dnPrincipals = caller.getPrincipals(X500Principal.class);
         if (dnPrincipals.size() != 1) {
             throw new NotAuthenticatedException("Authentication required (caller DN not found).");
         }
-        X500Principal callerDN = dnPrincipals.iterator().next();
+        X500Principal callerDN =  new X500Principal(AuthenticationUtil.canonizeDistinguishedName(
+                dnPrincipals.iterator().next().toString()));
+        boolean isSuperUser = config.superUsers.contains(callerDN);
 
+        if (AuthMethod.CERT.equals(AuthenticationUtil.getAuthMethod(caller)) && !isSuperUser) {
+            throw new AccessControlException(
+                    "Renewing certificate using certificate authentication not permitted: " + callerDN);
+        }
+
+        String path = syncInput.getPath();
 
         X500Principal userDN = callerDN;
         if (StringUtil.hasText(path)) {
             path = path.replace("^/+", "").replace("/+$", "");
             log.debug("User ID path " + path);
             Principal delegatedUser = getPrincipal(path);
-            if (config.superUsers.contains(callerDN)) {
-                if (delegatedUser instanceof X500Principal) {
-                    // no need for augment subject
-                    userDN = (X500Principal)delegatedUser;
-                } else {
-                    Subject delegatedSub = new Subject();
-                    delegatedSub.getPrincipals().add(delegatedUser);
-                    AuthenticationUtil.augmentSubject(delegatedSub);
-                    dnPrincipals = delegatedSub.getPrincipals(X500Principal.class);
-                    if (dnPrincipals.size() != 1) {
-                        throw new NotAuthenticatedException("User not found: " + delegatedUser);
-                    }
-                    userDN = dnPrincipals.iterator().next();
-                }
+            if (delegatedUser instanceof X500Principal) {
+                // no need for augment subject
+                userDN = (X500Principal)delegatedUser;
             } else {
-                throw new AccessControlException("Not a superuser: " + callerDN);
+                Subject delegatedSub = new Subject();
+                delegatedSub.getPrincipals().add(delegatedUser);
+                AuthenticationUtil.augmentSubject(delegatedSub);
+                dnPrincipals = delegatedSub.getPrincipals(X500Principal.class);
+                if (dnPrincipals.size() != 1) {
+                    throw new ResourceNotFoundException("User not found: " + delegatedUser);
+                }
+                userDN = dnPrincipals.iterator().next();
             }
+            // canonize the DN
+            userDN = new X500Principal(AuthenticationUtil.canonizeDistinguishedName(userDN.getName()));
+        }
+        if (isSuperUser && userDN.equals(callerDN)
+                && AuthMethod.CERT.equals(AuthenticationUtil.getAuthMethod(caller))) {
+            throw new AccessControlException(
+                    "Renewing certificate using certificate authentication not permitted: " + callerDN);
         }
         float daysValid = config.maxDaysValid;
         String daysValidStr = syncInput.getParameter("daysValid");
@@ -249,25 +250,11 @@ public class GetCertAction extends RestAction {
      * @param user The X500Name to generate for.
      * @param daysValid Days the certificate will be valid for
      * @return X509CertificateChain generated and signed certificate chain
-     * @throws NoSuchAlgorithmException
-     * @throws IllegalStateException
-     * @throws CertificateException
-     * @throws CertificateNotYetValidException
-     * @throws CertificateExpiredException
-     * @throws IOException
      */
-    private X509Certificate generateCertificate(final X500Name user, PublicKey publicKey, X509CertificateChain signer, float daysValid)
-            throws NoSuchAlgorithmException,
-            IllegalStateException, CertificateException,
-            OperatorCreationException, IOException {
-
-
-        // enforce this or not?
-        //        if (!canonizedDN.contains(CADC_DN))
-        //        {
-        //            throw new IllegalArgumentException(
-        //                    "Wrong o, ou, or c fields in user DN: " + userDN);
-        //        }
+    private X509Certificate generateCertificate(
+            final X500Name user, PublicKey publicKey, X509CertificateChain signer, float daysValid) throws
+            NoSuchAlgorithmException, IllegalStateException, CertificateException, OperatorCreationException,
+            IOException {
 
         // set validity
         GregorianCalendar notBeforeDate = new GregorianCalendar(TimeZone.getTimeZone("GMT"));
@@ -275,9 +262,7 @@ public class GetCertAction extends RestAction {
         GregorianCalendar notAfterDate = new GregorianCalendar(TimeZone.getTimeZone("GMT"));
         notAfterDate.add(Calendar.HOUR, Math.round(daysValid * 24));
 
-        //
         // create the certificate - version 3
-        //
         X500Principal signerUser = signer.getChain()[0].getSubjectX500Principal();
         log.debug("Create cert for user " + user + " signed by " + signerUser);
         X509v3CertificateBuilder v3CertBldr = new X509v3CertificateBuilder(
@@ -288,9 +273,7 @@ public class GetCertAction extends RestAction {
                 user,
                 SubjectPublicKeyInfo.getInstance(publicKey.getEncoded()));
 
-        //
         // extensions
-        //
         JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
         JcaX509ExtensionUtils utils = new JcaX509ExtensionUtils();
         v3CertBldr.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
