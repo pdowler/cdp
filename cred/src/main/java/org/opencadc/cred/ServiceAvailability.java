@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2022.                            (c) 2022.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -71,16 +71,22 @@ package org.opencadc.cred;
 
 import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
-import org.opencadc.cred.db.CertificateDAO;
+import ca.nrc.cadc.vosi.avail.CheckCertificate;
+import ca.nrc.cadc.vosi.avail.CheckException;
+import java.io.File;
+import javax.naming.Context;
+import javax.naming.InitialContext;
 
 public class ServiceAvailability implements AvailabilityPlugin {
+
+    private String appName;
 
     public ServiceAvailability() {
     }
 
     @Override
     public void setAppName(String appName) {
-        // no op
+        this.appName = appName;
     }
 
     @Override
@@ -93,13 +99,24 @@ public class ServiceAvailability implements AvailabilityPlugin {
         boolean isGood = true;
         String note = "service is accepting requests";
         try {
-            CertificateDAO dao = new CertificateDAO("cred"); // hard-coded schema
-            dao.exists("no-such-key");
+            CredConfig config = CredInitAction.getConfig(appName);
+            File signCertFile = new File(config.signingCert);
+            if (signCertFile.exists() && signCertFile.canRead()) {
+                CheckCertificate checkCert = new CheckCertificate(signCertFile);
+                checkCert.check();
+            } else {
+                throw new CheckException("Configured signing cert not readable: " + signCertFile.getPath());
+            }
+        } catch (CheckException ce) {
+            // tests determined that the resource is not working
+            isGood = false;
+            note = ce.getMessage();
         } catch (Throwable t) {
             // the test itself failed
             isGood = false;
-            note = "test failed, reason: " + t;
+            note = "test failed, reason: " + t.getMessage();
         }
+
         return new Availability(isGood, note);
     }
 

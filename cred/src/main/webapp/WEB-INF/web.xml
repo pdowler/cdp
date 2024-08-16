@@ -4,7 +4,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2022.                            (c) 2022.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -102,7 +102,7 @@
             </param-value>
         </init-param>
         <load-on-startup>1</load-on-startup>
-      </servlet>    
+      </servlet>
 
   <!-- temporary invisible init servlet until we port core delegation servlet to cadc-rest -->
   <servlet>
@@ -152,12 +152,18 @@
     </init-param>
     <load-on-startup>3</load-on-startup>
   </servlet>
-  
+
+  <!--
+    The Cred Endpoints
+  -->
   <servlet-mapping>
     <servlet-name>CertGenServlet</servlet-name>
     <url-pattern>/generate/*</url-pattern>
   </servlet-mapping>
-  
+
+  <!--
+    The Capabilities service.
+  -->
   <servlet-mapping>
       <servlet-name>CapabilitiesServlet</servlet-name>
       <url-pattern>/capabilities</url-pattern>

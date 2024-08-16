@@ -67,8 +67,8 @@
 
 package org.opencadc.cred;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import javax.security.auth.x500.X500Principal;
 import org.apache.log4j.Logger;
 
@@ -81,28 +81,18 @@ import org.apache.log4j.Logger;
 public class CredConfig {
     private static final Logger log = Logger.getLogger(CredConfig.class);
 
-    private final List<X500Principal> delegateUsers = new ArrayList<>();
-    private final List<X500Principal> proxyUsers = new ArrayList<>();
-    public float proxyMaxDaysValid = 30.0f;
-    
-    public CredConfig() { 
+    public float maxDaysValid = 30.0f;
+
+    public String signingCert;
+
+    public CredConfig() {
     }
 
-    public List<X500Principal> getDelegateUsers() {
-        return delegateUsers;
-    }
-
-    public List<X500Principal> getProxyUsers() {
-        return proxyUsers;
-    }
+    Set<X500Principal> superUsers = new HashSet<>();
 
     @Override
     public String toString() {
         return CredConfig.class.getName() + "[" 
-                + "trusted=" + proxyUsers.size() + ","
-                + "su=" + delegateUsers.size() + ","
-                + "proxyMaxDaysValid=" + proxyMaxDaysValid + "]";
+                + "maxDaysValid=" + maxDaysValid + ", signingCert=" + signingCert + "]";
     }
-    
-    
 }
