@@ -79,6 +79,6 @@ public class VosiAvailabilityTest extends AvailabilityTest
 
     public VosiAvailabilityTest()
     {
-        super(URI.create("ivo://cadc.nrc.ca/cred"));
+        super(Constants.RESOURCE_IDENTIFIER);
     }
 }
