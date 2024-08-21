@@ -65,7 +65,7 @@
 *  $Revision: 4 $
 *
 ************************************************************************
-*/
+ */
 
 package org.opencadc.cred;
 
@@ -82,8 +82,10 @@ import ca.nrc.cadc.net.ResourceAlreadyExistsException;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
+import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.net.URI;
@@ -105,25 +107,27 @@ import org.junit.Test;
 /**
  * Class to test a cred service. The test requires that an entry in the ~/.netrc file corresponding to a super-user identity
  * to be used in the test for the CADC login URL. (user must be configured as a superuser in the test service)
+ *
  * @author adriand
  */
-public class GetCertTest
-{
+public class GetCertTest {
     private static final Logger log = Logger.getLogger(GetCertTest.class);
-    
-    private static final URI RESOURCE_IDENTIFIER = URI.create("ivo://cadc.nrc.ca/cred");
 
-    private final PasswordAuthentication up;
-    private final String cadcToken;
+    private static final String SUPER_CERT_FILENAME = "cred-super.pem";
     
-    static
-    {
+    // ugh: this gets set as a side effect of the most recent getToken() or addBasicAuth()
+    private String netrcUserID;
+
+    static {
         Log4jInit.setLevel("org.opencadc.cred", Level.DEBUG);
     }
+
+    public GetCertTest() {
+    }
     
-    public GetCertTest() throws ResourceAlreadyExistsException, IOException, ResourceNotFoundException, InterruptedException {
-        RegistryClient reg = new RegistryClient();
-        URL capURL = reg.getServiceURL(RESOURCE_IDENTIFIER, Standards.VOSI_CAPABILITIES, AuthMethod.ANON);
+    private String getToken(RegistryClient reg)
+        throws ResourceAlreadyExistsException, IOException, ResourceNotFoundException, InterruptedException {
+        URL capURL = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.VOSI_CAPABILITIES, AuthMethod.ANON);
         HttpGet head = new HttpGet(capURL, false);
         head.setHeadOnly(true);
         head.prepare();
@@ -155,36 +159,59 @@ public class GetCertTest
 
         log.info("loginURL: " + loginURL);
         NetrcFile netrc = new NetrcFile();
-        up = netrc.getCredentials(loginURL.getHost(), true);
+        PasswordAuthentication up = netrc.getCredentials(loginURL.getHost(), true);
         if (up == null) {
             throw new RuntimeException("no credentials in .netrc file for host " + loginURL.getHost());
         }
-        Map<String,Object> params = new TreeMap<>();
+        Map<String, Object> params = new TreeMap<>();
         params.put("username", up.getUserName());
         params.put("password", up.getPassword());
         HttpPost login = new HttpPost(loginURL, params, true);
         login.prepare();
-        cadcToken = login.getResponseHeader("x-vo-bearer");
+        String cadcToken = login.getResponseHeader("x-vo-bearer");
         Assert.assertNotNull("successful login", cadcToken);
 
+        // verify token
         head.setHeadOnly(true);
         head.setRequestProperty("authorization", "bearer " + cadcToken);
         head.prepare();
         String ident = head.getResponseHeader("x-vo-authenticated");
         log.info("authenticated as: " + ident);
         Assert.assertNotNull("successful authenticated call", ident);
+        
+        this.netrcUserID = up.getUserName();
+        return cadcToken;
+    }
+
+    private void addBasicAuthHeader(HttpGet get) {
+        log.info("loginURL: " + get.getURL());
+        NetrcFile netrc = new NetrcFile();
+        PasswordAuthentication up = netrc.getCredentials(get.getURL().getHost(), true);
+        if (up == null) {
+            throw new RuntimeException("no credentials in .netrc file for host " + get.getURL().getHost());
+        }
+        String valueToEncode = up.getUserName() + ":" + new String(up.getPassword());
+        String headerValue = AuthenticationUtil.CHALLENGE_TYPE_BASIC + " " + Base64.getEncoder().encodeToString(valueToEncode.getBytes());
+        get.setRequestProperty("Authorization", headerValue);
+        log.info("username: " + up.getUserName() + " authorization: " + headerValue);
+        this.netrcUserID = up.getUserName();
     }
     
     @Test
     public void testGetCertWithToken() throws Exception {
-        // try various methods of exchanging user credentials for tokens that can be used back to authenticate
+        // this uses a username/password from ~/.netrc to obtain a token and then
+        // uses the token to obtain a certificate
         RegistryClient reg = new RegistryClient();
-        URL credUrl = reg.getServiceURL(RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
-
-        log.debug("get cert, URL=" + credUrl);
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        URL baseURL = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
+        
+        final String cadcToken = getToken(reg);
+        
         float daysValid = 3; // 3 days cert
-        HttpGet get = new HttpGet(new URL(credUrl.toString() + "?daysValid=" + daysValid), bos);
+        URL credUrl = new URL(baseURL.toExternalForm() + "?daysValid=" + daysValid);
+        log.info("get cert URL: " + credUrl);
+        
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(credUrl, bos);
         get.setRequestProperty("authorization", "bearer " + cadcToken);
         get.run();
         Assert.assertEquals(200, get.getResponseCode());
@@ -195,16 +222,19 @@ public class GetCertTest
 
         X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(certificate);
         Date now = new Date();
-        int hour = 60*60*1000;
-        Date expired = new Date(now.getTime() + (long)(daysValid*24+1)*hour);  // add 1h after daysValid
+        int hour = 60 * 60 * 1000;
+        Date expired = new Date(now.getTime() + (long) (daysValid * 24 + 1) * hour);  // add 1h after daysValid
         Assert.assertTrue(chain.getExpiryDate().after(now));
         Assert.assertTrue(chain.getExpiryDate().before(expired));
-        verifyCert(chain);
+        verifyCert(chain, netrcUserID);
 
         // get cert by userid
-        String userID = "cadcregtest1";
+        // this assumes the token ident in the netrc is configured as a super-user
+        final String userID = "cadcregtest1";
         bos = new ByteArrayOutputStream();
-        get = new HttpGet(new URL(credUrl + "/userid/" + userID), bos);
+        credUrl = new URL(baseURL.toExternalForm() + "/userid/" + userID + "?daysValid=" + daysValid);
+        log.info("get cert URL: " + credUrl);
+        get = new HttpGet(credUrl, bos);
         get.setRequestProperty("authorization", "bearer " + cadcToken);
         get.run();
         Assert.assertEquals(200, get.getResponseCode());
@@ -214,9 +244,12 @@ public class GetCertTest
         verifyCert(chain, userID);
 
         // get a cert for same user using their DN
-        String userDN = "C=ca,O=hia,OU=cadc,CN=cadcregtest1_b5d";
+        // same assumption as above
+        final String userDN = "C=ca,O=hia,OU=cadc,CN=cadcregtest1_b5d";
         bos = new ByteArrayOutputStream();
-        get = new HttpGet(new URL(credUrl + "/dn/" + userDN), bos);
+        credUrl = new URL(baseURL.toExternalForm() + "/dn/" + userDN + "?daysValid=" + daysValid);
+        log.info("get cert URL: " + credUrl);
+        get = new HttpGet(credUrl, bos);
         get.setRequestProperty("authorization", "bearer " + cadcToken);
         get.run();
         Assert.assertEquals(200, get.getResponseCode());
@@ -226,15 +259,17 @@ public class GetCertTest
         verifyCert(chain, userID);
 
         // get a cert for a made up DN
-        userDN = "C=ca,O=someorg,CN=user";
+        final String extUserDN = "C=ca,O=someorg,CN=user";
         bos = new ByteArrayOutputStream();
-        get = new HttpGet(new URL(credUrl + "/dn/" + userDN), bos);
+        credUrl = new URL(baseURL.toExternalForm() + "/dn/" + extUserDN + "?daysValid=" + daysValid);
+        log.info("get cert URL: " + credUrl);
+        get = new HttpGet(credUrl, bos);
         get.setRequestProperty("authorization", "bearer " + cadcToken);
         get.run();
         Assert.assertEquals(200, get.getResponseCode());
         certificate = bos.toByteArray();
         chain = SSLUtil.readPemCertificateAndKey(certificate);
-        Assert.assertEquals(userDN, chain.getChain()[0].getSubjectX500Principal().getName());
+        Assert.assertEquals(extUserDN, chain.getChain()[0].getSubjectX500Principal().getName());
         // it will not verify as the user is made up
     }
 
@@ -242,7 +277,7 @@ public class GetCertTest
     public void testGetCertWithUserPassword() throws Exception {
         // get a cert with user/password
         RegistryClient reg = new RegistryClient();
-        URL credUrl = reg.getServiceURL(RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
+        URL credUrl = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
 
         float daysValid = 3; // 3 days cert
         URL credDaysValidURL = new URL(credUrl.toString() + "?daysValid=" + daysValid);
@@ -258,7 +293,7 @@ public class GetCertTest
         Assert.assertTrue(certificate.length > 0);
 
         X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(certificate);
-        verifyCert(chain);
+        verifyCert(chain, netrcUserID);
 
         // get cert by userid
         String userID = "cadcregtest1";
@@ -289,46 +324,33 @@ public class GetCertTest
     public void testGetCertWithSuperuserCert() throws Exception {
         // try various methods of exchanging user credentials for tokens that can be
         RegistryClient reg = new RegistryClient();
-        URL credUrl = reg.getServiceURL(RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
+        URL baseURL = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.CERT);
 
-        float daysValid = 3; // 3 days cert
-        URL credDaysValidURL = new URL(credUrl.toString() + "?daysValid=" + daysValid);
-        log.debug("get cert, URL=" + credDaysValidURL);
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(credDaysValidURL, bos);
-        addBasicAuthHeader(get);
-        get.run();
-        Assert.assertEquals(200, get.getResponseCode());
-        byte[] certificate = bos.toByteArray();
-        Assert.assertNotNull(certificate);
-        log.debug("Downloaded Certificate of size: " + certificate.length);
-        Assert.assertTrue(certificate.length > 0);
-
-        X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(certificate);
-        verifyCert(chain);
-
-        Subject superUser = AuthenticationUtil.getSubject(chain);
+        File  sf = FileUtil.getFileFromResource(SUPER_CERT_FILENAME, GetCertTest.class);
+        Subject superUser = SSLUtil.createSubject(sf);
+        
         // get cert by userid
         String userID = "cadcregtest1";
-        bos = new ByteArrayOutputStream();
-        get = new HttpGet(new URL(credUrl + "/userid/" + userID), bos);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        URL credURL = new URL(baseURL + "/userid/" + userID);
+        log.info("get: " + credURL);
+        HttpGet get = new HttpGet(credURL, bos);
         Subject.doAs(superUser, new RunnableAction(get));
         Assert.assertEquals(200, get.getResponseCode());
-        certificate = bos.toByteArray();
-        chain = SSLUtil.readPemCertificateAndKey(certificate);
-        log.debug("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
+        X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(bos.toByteArray());
+        log.info("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
         verifyCert(chain, userID);
 
-        // get a cert for same user using their DN
+        // get a cert for a user using their DN
         String userDN = "C=ca,O=hia,OU=cadc,CN=cadcregtest1_b5d";
         bos = new ByteArrayOutputStream();
-        get = new HttpGet(new URL(credUrl + "/dn/" + userDN), bos);
-        addBasicAuthHeader(get);
+        credURL = new URL(baseURL + "/dn/" + userDN);
+        log.info("get: " + credURL);
+        get = new HttpGet(credURL, bos);
         Subject.doAs(superUser, new RunnableAction(get));
         Assert.assertEquals(200, get.getResponseCode());
-        certificate = bos.toByteArray();
-        chain = SSLUtil.readPemCertificateAndKey(certificate);
-        log.debug("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
+        chain = SSLUtil.readPemCertificateAndKey(bos.toByteArray());
+        log.info("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
         verifyCert(chain, userID);
     }
 
@@ -336,8 +358,10 @@ public class GetCertTest
     public void testGetCertFail() throws Exception {
 
         RegistryClient reg = new RegistryClient();
-        URL credUrl = reg.getServiceURL(RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
+        URL credUrl = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
 
+        final String cadcToken = getToken(reg);
+        
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         // very large expiration date
         float daysValid = 300; // 300 days cert
@@ -348,74 +372,64 @@ public class GetCertTest
         get.run();
         Assert.assertEquals(400, get.getResponseCode()); // illegalargument
         log.debug("generate, response code: " + get.getResponseCode());
-     }
-
-     @Test
-     public void testRenewWithCertFail() throws Exception {
-        // test neither users or superuser can renew their certs using cert authentication
-         // try various methods of exchanging user credentials for tokens that can be
-         RegistryClient reg = new RegistryClient();
-         URL credUrl = reg.getServiceURL(RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
-
-         float daysValid = 3; // 3 days cert
-         URL credDaysValidURL = new URL(credUrl.toString() + "?daysValid=" + daysValid);
-         log.debug("get cert, URL=" + credDaysValidURL);
-         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-         HttpGet get = new HttpGet(credDaysValidURL, bos);
-         addBasicAuthHeader(get);
-         get.run();
-         Assert.assertEquals(200, get.getResponseCode());
-         log.debug("generate, response code: " + get.getResponseCode());
-         byte[] certificate = bos.toByteArray();
-         Assert.assertNotNull(certificate);
-         log.debug("Downloaded Certificate of size: " + certificate.length);
-         Assert.assertTrue(certificate.length > 0);
-
-         X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(certificate);
-         verifyCert(chain);
-
-         // try to renew superuser
-         Subject superUser = AuthenticationUtil.getSubject(chain);
-         bos = new ByteArrayOutputStream();
-         get = new HttpGet(credUrl, bos);
-         Subject.doAs(superUser, new RunnableAction(get));
-         Assert.assertEquals(403, get.getResponseCode());
-
-         // get a user cert
-         String userID = "cadcregtest1";
-         bos = new ByteArrayOutputStream();
-         get = new HttpGet(new URL(credUrl + "/userid/" + userID), bos);
-         Subject.doAs(superUser, new RunnableAction(get));
-         Assert.assertEquals(200, get.getResponseCode());
-         certificate = bos.toByteArray();
-         chain = SSLUtil.readPemCertificateAndKey(certificate);
-         log.debug("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
-         verifyCert(chain, userID);
-
-         // try to renew user cert
-         Subject regUser = AuthenticationUtil.getSubject(chain);
-         bos = new ByteArrayOutputStream();
-         get = new HttpGet(credUrl, bos);
-         Subject.doAs(regUser, new RunnableAction(get));
-         Assert.assertEquals(403, get.getResponseCode());
-     }
-
-    private void addBasicAuthHeader(HttpGet get) {
-        String valueToEncode = up.getUserName() + ":" + new String(up.getPassword());
-        String headerValue = AuthenticationUtil.CHALLENGE_TYPE_BASIC + " " + Base64.getEncoder().encodeToString(valueToEncode.getBytes());
-        get.setRequestProperty("Authorization", headerValue);
     }
 
-    private void verifyCert(X509CertificateChain cert) throws PrivilegedActionException {
-        verifyCert(cert, up.getUserName());
+    @Test
+    public void testRenewWithCertFail() throws Exception {
+        // test neither users or superuser can renew their certs using cert authentication
+        // try various methods of exchanging user credentials for tokens that can be
+        RegistryClient reg = new RegistryClient();
+        URL credUrl = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
+
+        float daysValid = 3; // 3 days cert
+        URL credDaysValidURL = new URL(credUrl.toString() + "?daysValid=" + daysValid);
+        log.debug("get cert, URL=" + credDaysValidURL);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(credDaysValidURL, bos);
+        addBasicAuthHeader(get);
+        get.run();
+        Assert.assertEquals(200, get.getResponseCode());
+        log.debug("generate, response code: " + get.getResponseCode());
+        byte[] certificate = bos.toByteArray();
+        Assert.assertNotNull(certificate);
+        log.debug("Downloaded Certificate of size: " + certificate.length);
+        Assert.assertTrue(certificate.length > 0);
+
+        X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(certificate);
+        verifyCert(chain, netrcUserID);
+
+        // try to renew superuser
+        Subject superUser = AuthenticationUtil.getSubject(chain);
+        bos = new ByteArrayOutputStream();
+        get = new HttpGet(credUrl, bos);
+        Subject.doAs(superUser, new RunnableAction(get));
+        Assert.assertEquals(403, get.getResponseCode());
+
+        // get a user cert
+        String userID = "cadcregtest1";
+        bos = new ByteArrayOutputStream();
+        get = new HttpGet(new URL(credUrl + "/userid/" + userID), bos);
+        Subject.doAs(superUser, new RunnableAction(get));
+        Assert.assertEquals(200, get.getResponseCode());
+        certificate = bos.toByteArray();
+        chain = SSLUtil.readPemCertificateAndKey(certificate);
+        log.debug("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
+        verifyCert(chain, userID);
+
+        // try to renew user cert
+        Subject regUser = AuthenticationUtil.getSubject(chain);
+        bos = new ByteArrayOutputStream();
+        get = new HttpGet(credUrl, bos);
+        Subject.doAs(regUser, new RunnableAction(get));
+        Assert.assertEquals(403, get.getResponseCode());
     }
 
     private void verifyCert(X509CertificateChain cert, String userID) throws PrivilegedActionException {
         // use the cert to access capabilities and check the authenticated user header
         RegistryClient reg = new RegistryClient();
-        URL capURL = reg.getServiceURL(RESOURCE_IDENTIFIER, Standards.VOSI_CAPABILITIES, AuthMethod.ANON);
+        URL capURL = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.VOSI_CAPABILITIES, AuthMethod.ANON);
 
-        Subject userSubject =  AuthenticationUtil.getSubject(cert);
+        Subject userSubject = AuthenticationUtil.getSubject(cert);
         boolean ok = Subject.doAs(userSubject, (PrivilegedExceptionAction<Boolean>) () -> {
             HttpGet head = new HttpGet(capURL, false);
             head.setHeadOnly(true);

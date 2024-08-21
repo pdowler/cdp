@@ -72,7 +72,7 @@
 
 <web-app>
   
-  <display-name>cred_ws</display-name>
+  <display-name>cred</display-name>
   <welcome-file-list>
     <welcome-file>index.html</welcome-file>
   </welcome-file-list>
@@ -95,7 +95,6 @@
             <param-value>
                 org.opencadc.cred
                 ca.nrc.cadc.cred
-                org.astrogrid.security.delegation
                 ca.nrc.cadc.auth
                 ca.nrc.cadc.rest
                 ca.nrc.cadc.vosi
@@ -104,7 +103,6 @@
         <load-on-startup>1</load-on-startup>
       </servlet>
 
-  <!-- temporary invisible init servlet until we port core delegation servlet to cadc-rest -->
   <servlet>
       <servlet-name>CertGenServlet</servlet-name>
         <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
@@ -112,7 +110,6 @@
             <param-name>init</param-name>
             <param-value>org.opencadc.cred.CredInitAction</param-value>
         </init-param>
-        
         <init-param>
             <param-name>get</param-name>
             <param-value>org.opencadc.cred.GetCertAction</param-value>
@@ -153,17 +150,11 @@
     <load-on-startup>3</load-on-startup>
   </servlet>
 
-  <!--
-    The Cred Endpoints
-  -->
   <servlet-mapping>
     <servlet-name>CertGenServlet</servlet-name>
     <url-pattern>/generate/*</url-pattern>
   </servlet-mapping>
 
-  <!--
-    The Capabilities service.
-  -->
   <servlet-mapping>
       <servlet-name>CapabilitiesServlet</servlet-name>
       <url-pattern>/capabilities</url-pattern>

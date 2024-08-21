@@ -79,6 +79,6 @@ public class VosiCapabilitiesTest extends CapabilitiesTest
 
     public VosiCapabilitiesTest()
     {
-        super(URI.create("ivo://cadc.nrc.ca/cred"));
+        super(Constants.RESOURCE_IDENTIFIER);
     }
 }
