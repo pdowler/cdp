@@ -1,6 +1,6 @@
 # X509 Client Certificate Generation service (cred)
 
-The `cred` service can generate internally signed client certifciates for users so that
+The `cred` service can generate internally signed client certificates for users so that
 services can make transitive calls to other services _as the user_ that use/share the same 
 AAI system. 
 

@@ -1,0 +1,164 @@
+swagger: '2.0'
+info:
+  version: 2.1.0
+  title: CADC Credential Service
+  description: >
+    The credential web service is used to exchange user credentials for short-lived X509 client certificates. These certificates are signed by the operator and only valid for use by other services that rely on the same AAI (Authentication & Authorization Infrastructure).
+paths:
+  /generate:
+    get:
+      description: Generate a X509 certificate for the authenticated user
+      tags:
+        - X509 Certificate
+      schemes:
+        - https
+      responses:
+        '200':
+          description: Successful response
+          schema:
+            title: The X509 certificate
+            type: file
+        '401':
+          description: caller not authenticated
+        '403':
+          description: caller not authorized
+        '404':
+          description: user not found
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpeced error
+      parameters:
+        - name: daysValid
+          in: query
+          description: >-
+            The length of time before the proxy certificate expires. The maximum time depends on service configuration. If not provided, the service will use an internal default value.
+          required: false
+          type: number
+  /generate/dn/{X500-distinguished-name}:
+    get:
+      description: >
+        Generate a X509 certificate for the specified user. Note: Only
+        privileged users (allowed by service config) can get proxy certificates for other users; this endpoint is intended for operator use.
+      tags:
+        - X509 Certificate
+      schemes:
+        - https
+      responses:
+        '200':
+          description: Successful response
+          schema:
+            title: The X509 certificate
+            type: file
+        '401':
+          description: Unauthorized - User not authenticated
+        '403':
+          description: caller not authorized
+        '404':
+          description: Not Found - User not found
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
+      parameters:
+        - name: X500-distinguished-name
+          in: path
+          description: >-
+            An X500 Distinguished Name. The value must be URL encoded because
+            distinguished names may contain spaces and other special characters.
+          required: true
+          type: string
+        - name: daysValid
+          in: query
+          description: >-
+            The length of time before the proxy certificate expires. The maximum time depends on service configuration. If not provided, the service will use an internal default value.
+          required: false
+          type: number
+  /generate/userid/{username}:
+    get:
+      description: >-
+        Generate an X509 certificate for the specified user.  Note: Only
+        privileged system users can get proxy certificates for anyone but
+        themselves so this endpoint is not generally useful.
+      tags:
+        - X509 Certificate
+      schemes:
+        - https
+      responses:
+        '200':
+          description: Successful response
+          schema:
+            title: The X509 certificate
+            type: file
+        '401':
+          description: caller not authenticated
+        '403':
+          description: caller not authorized
+        '404':
+          description: user not found
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
+      parameters:
+        - name: username
+          in: path
+          description: a username known to the AAI system
+          required: true
+          type: string
+        - name: daysValid
+          in: query
+          description: >-
+            The length of time before the proxy certificate expires. The maximum time depends on service configuration. If not provided, the service will use an internal default value.
+          required: false
+          type: number
+  /availability:
+    get:
+      tags:
+        - Support Interfaces
+      summary: VOSI Availability
+      description: >-
+        Indicates whether the service is operable and shows the reliability of
+        the service for extended and scheduled requests. If the query parameter
+        'detail=min' is used, a light weight heart beat test will be performed.
+        The heart beat test returns status 200 if the service is available.
+      parameters:
+        - name: detail
+          in: query
+          description: >-
+            specifies heart beat to be used to check for availability of this
+            service, the value 'min' must be used, otherwise the full
+            availability test will be performed
+          required: false
+          type: string
+      responses:
+        '200':
+          description: A VOSI availability document in XML.
+        default:
+          description: Unexpected error
+  /capabilities:
+    get:
+      summary: VOSI Capabilities
+      tags:
+        - Support Interfaces
+      description: >
+        Provides the service metadata in the form of a list of Capability
+        descriptions.
+      produces:
+        - text/xml
+      responses:
+        '200':
+          description: A VOSI Capabilities document in XML.
+        '500':
+          description: Internal server error
+        '503':
+          description: Service too busy
+        default:
+          description: Unexpected error
+
