@@ -93,6 +93,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 
@@ -124,7 +125,10 @@ public class BasicAuthIdentityManager implements IdentityManager {
 
     @Override
     public Set<URI> getSecurityMethods() {
-        return origIM.getSecurityMethods();
+        Set<URI> ret = new TreeSet<>();
+        ret.addAll(origIM.getSecurityMethods());
+        ret.add(Standards.SECURITY_METHOD_HTTP_BASIC);
+        return ret;
     }
 
     @Override

@@ -74,6 +74,7 @@ import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.CertUtil;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
@@ -233,9 +234,12 @@ public class GetCertAction extends RestAction {
             throw new IllegalArgumentException("Invalid path " + path);
         }
         Principal delegatedUser;
+        // must match cadc-cdp CredClient encoding when reading the path here
         if ("dn".equalsIgnoreCase(parts[0])) {
-            delegatedUser = new X500Principal(parts[1]);
+            String xdn = NetUtil.decode(parts[1]);
+            delegatedUser = new X500Principal(xdn);
         } else if ("userid".equalsIgnoreCase(parts[0])) {
+            // assume username is safe??
             delegatedUser = new HttpPrincipal(parts[1]);
         } else {
             throw new IllegalArgumentException("Only dn and userid delegations supported: " + path);
