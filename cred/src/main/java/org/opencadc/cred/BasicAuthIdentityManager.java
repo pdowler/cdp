@@ -156,7 +156,6 @@ public class BasicAuthIdentityManager implements IdentityManager {
                     username = up[0];
                     password = up[1];
                 }
-                log.error(username + " " + password);
                 if (username != null && password != null) {
                     LocalAuthority loc = new LocalAuthority();
                     URI resourceID = loc.getServiceURI(Standards.SECURITY_METHOD_PASSWORD.toASCIIString());
@@ -168,7 +167,7 @@ public class BasicAuthIdentityManager implements IdentityManager {
                         params.put("password", password);
                         HttpPost login = new HttpPost(loginURL, params, true);
                         try {
-                            log.warn("attempting login...");
+                            log.debug("attempting login...");
                             login.prepare();
                             final String tokenKey = "x-vo-bearer";
                             String token = login.getResponseHeader(tokenKey);
