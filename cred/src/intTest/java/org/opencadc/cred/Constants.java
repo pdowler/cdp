@@ -68,7 +68,6 @@
 package org.opencadc.cred;
 
 import java.net.URI;
-import org.apache.log4j.Logger;
 
 /**
  *
@@ -77,6 +76,7 @@ import org.apache.log4j.Logger;
 public class Constants {
 
     public static final URI RESOURCE_IDENTIFIER = URI.create("ivo://opencadc.org/cred");
+    //public static final URI RESOURCE_IDENTIFIER = URI.create("ivo://cadc.nrc.ca/cred");
     
     public Constants() { 
     }

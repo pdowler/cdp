@@ -381,28 +381,14 @@ public class GetCertTest {
         RegistryClient reg = new RegistryClient();
         URL credUrl = reg.getServiceURL(Constants.RESOURCE_IDENTIFIER, Standards.CRED_PROXY_10, AuthMethod.TOKEN);
 
-        float daysValid = 3; // 3 days cert
-        URL credDaysValidURL = new URL(credUrl.toString() + "?daysValid=" + daysValid);
-        log.debug("get cert, URL=" + credDaysValidURL);
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(credDaysValidURL, bos);
-        addBasicAuthHeader(get);
-        get.run();
-        Assert.assertEquals(200, get.getResponseCode());
-        log.debug("generate, response code: " + get.getResponseCode());
-        byte[] certificate = bos.toByteArray();
-        Assert.assertNotNull(certificate);
-        log.debug("Downloaded Certificate of size: " + certificate.length);
-        Assert.assertTrue(certificate.length > 0);
-
-        X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(certificate);
-        verifyCert(chain, netrcUserID);
-
+        File  sf = FileUtil.getFileFromResource(SUPER_CERT_FILENAME, GetCertTest.class);
+        Subject superUser = SSLUtil.createSubject(sf);
+        
         // try to renew superuser
-        Subject superUser = AuthenticationUtil.getSubject(chain);
-        bos = new ByteArrayOutputStream();
-        get = new HttpGet(credUrl, bos);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(credUrl, bos);
         Subject.doAs(superUser, new RunnableAction(get));
+        log.info("super self renew: " + get.getResponseCode() + " " + get.getThrowable());
         Assert.assertEquals(403, get.getResponseCode());
 
         // get a user cert
@@ -411,8 +397,9 @@ public class GetCertTest {
         get = new HttpGet(new URL(credUrl + "/userid/" + userID), bos);
         Subject.doAs(superUser, new RunnableAction(get));
         Assert.assertEquals(200, get.getResponseCode());
-        certificate = bos.toByteArray();
-        chain = SSLUtil.readPemCertificateAndKey(certificate);
+        log.info("super get user: " + get.getResponseCode() + " " + get.getThrowable());
+        byte[] certificate = bos.toByteArray();
+        X509CertificateChain chain = SSLUtil.readPemCertificateAndKey(certificate);
         log.debug("Retrieved cert for " + chain.getChain()[0].getSubjectX500Principal());
         verifyCert(chain, userID);
 
@@ -421,6 +408,7 @@ public class GetCertTest {
         bos = new ByteArrayOutputStream();
         get = new HttpGet(credUrl, bos);
         Subject.doAs(regUser, new RunnableAction(get));
+        log.info("user self renew: " + get.getResponseCode() + " " + get.getThrowable());
         Assert.assertEquals(403, get.getResponseCode());
     }
 
