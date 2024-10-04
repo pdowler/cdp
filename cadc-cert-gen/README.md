@@ -1,4 +1,8 @@
-# cadc-cert-gen
+# cadc-cert-gen - OBSOLETE
+
+This tool is no longer needed since the `cred` service is now an on-the-fly certificate generator.
+
+---
 
 Simple tool to enable someone to use their cadc-cdp-server based CDP service as an internal CA to 
 provide local user certificates.
