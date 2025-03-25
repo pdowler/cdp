@@ -1,7 +1,4 @@
 plugins {
-    id 'java'
-    id 'maven'
-    id 'maven-publish'
     id 'war'
     id 'checkstyle'
 }
@@ -12,6 +9,8 @@ repositories {
 }
 
 apply from: '../opencadc.gradle'
+
+sourceCompatibility = 11
 
 group = 'ca.nrc.cadc'
 
