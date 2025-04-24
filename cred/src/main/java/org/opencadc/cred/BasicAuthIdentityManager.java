@@ -126,7 +126,11 @@ public class BasicAuthIdentityManager implements IdentityManager {
     @Override
     public Set<URI> getSecurityMethods() {
         Set<URI> ret = new TreeSet<>();
-        ret.addAll(origIM.getSecurityMethods());
+        for (URI sm : origIM.getSecurityMethods()) {
+            if (!sm.equals(Standards.SECURITY_METHOD_CERT)) {
+                ret.add(sm);
+            }
+        }
         ret.add(Standards.SECURITY_METHOD_HTTP_BASIC);
         return ret;
     }
