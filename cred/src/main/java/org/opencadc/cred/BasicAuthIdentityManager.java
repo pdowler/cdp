@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2024.                            (c) 2024.
+*  (c) 2025.                            (c) 2025.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -127,6 +127,11 @@ public class BasicAuthIdentityManager implements IdentityManager {
     public Set<URI> getSecurityMethods() {
         Set<URI> ret = new TreeSet<>();
         for (URI sm : origIM.getSecurityMethods()) {
+            // remove declaration of supporting certs since the service code enforces that a caller cannot 
+            // use a cert to get a new cert (renew)
+            // there is an admin that can get a user cert with an admin cert and that stills works as long as 
+            // this only effects declared (www-authenticate headers and VOSI-capabilities doc) and not actual 
+            // support
             if (!sm.equals(Standards.SECURITY_METHOD_CERT)) {
                 ret.add(sm);
             }
