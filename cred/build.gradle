@@ -22,8 +22,8 @@ war {
 
 dependencies {
     compile 'org.opencadc:cadc-util:[1.11.2,2.0)'
-    compile 'org.opencadc:cadc-rest:[1.4.0,)'
-    compile 'org.opencadc:cadc-vosi:[1.4.7,)'
+    compile 'org.opencadc:cadc-rest:[1.4.5,)'
+    compile 'org.opencadc:cadc-vosi:[1.4.9,)'
     compile 'org.opencadc:cadc-log:[1.2.1,)'
     compile 'org.opencadc:cadc-cdp:[1.4.0,)'
 
@@ -34,4 +34,5 @@ dependencies {
     testCompile 'junit:junit:[4.0,)'
 
     intTestCompile 'org.opencadc:cadc-test-vosi:[1.0.14,)'
+    intTestCompile 'javax.servlet:javax.servlet-api:[3.1.0,)'
 }
