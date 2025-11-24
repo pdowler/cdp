@@ -161,16 +161,18 @@ public class BasicAuthIdentityManager implements IdentityManager {
                     Base64.Decoder dec = Base64.getDecoder();
                     byte[] b = dec.decode(ss[1]);
                     String creds = new String(b); // default charset
-                    String[] up = creds.split(":");
-                    username = up[0];
-                    password = up[1];
+                    int colonIndex = creds.indexOf(":");
+                    username = creds.substring(0, colonIndex);
+                    password = creds.substring(colonIndex + 1);
                 }
                 if (username != null && password != null) {
                     LocalAuthority loc = new LocalAuthority();
                     URI resourceID = loc.getServiceURI(Standards.SECURITY_METHOD_PASSWORD.toASCIIString());
                     if (resourceID != null) {
+                        log.debug("found cred proxy at " + resourceID);
                         RegistryClient reg = new RegistryClient();
                         URL loginURL = reg.getServiceURL(resourceID, Standards.SECURITY_METHOD_PASSWORD, AuthMethod.ANON);
+                        log.debug("login url: " + loginURL);
                         Map<String,Object> params = new TreeMap<>();
                         params.put("username", username);
                         params.put("password", password);
