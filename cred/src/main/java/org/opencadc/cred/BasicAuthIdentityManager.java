@@ -162,6 +162,9 @@ public class BasicAuthIdentityManager implements IdentityManager {
                     byte[] b = dec.decode(ss[1]);
                     String creds = new String(b); // default charset
                     int colonIndex = creds.indexOf(":");
+                    if (colonIndex < 1) {
+                        throw new NotAuthenticatedException("BUG: cannot parse user/passwd for basic challange");
+                    }
                     username = creds.substring(0, colonIndex);
                     password = creds.substring(colonIndex + 1);
                 }
@@ -169,10 +172,8 @@ public class BasicAuthIdentityManager implements IdentityManager {
                     LocalAuthority loc = new LocalAuthority();
                     URI resourceID = loc.getServiceURI(Standards.SECURITY_METHOD_PASSWORD.toASCIIString());
                     if (resourceID != null) {
-                        log.debug("found cred proxy at " + resourceID);
                         RegistryClient reg = new RegistryClient();
                         URL loginURL = reg.getServiceURL(resourceID, Standards.SECURITY_METHOD_PASSWORD, AuthMethod.ANON);
-                        log.debug("login url: " + loginURL);
                         Map<String,Object> params = new TreeMap<>();
                         params.put("username", username);
                         params.put("password", password);
