@@ -25,10 +25,10 @@ mainClassName = 'ca.nrc.cadc.cred.client.Main'
 
 dependencies {
     implementation 'xerces:xercesImpl:[2.12.1,3.0)'
-    implementation 'org.bouncycastle:bcprov-jdk18on:[1.70,2.0)'
-    implementation 'org.bouncycastle:bcpkix-jdk18on:[1.70,2.0)'
-    implementation 'org.opencadc:cadc-util:[1.11,)'
-    implementation 'org.opencadc:cadc-registry:[1.4,)'
+    api 'org.bouncycastle:bcprov-jdk18on:[1.70,2.0)'
+    api 'org.bouncycastle:bcpkix-jdk18on:[1.70,2.0)'
+    api 'org.opencadc:cadc-util:[1.11,)'
+    api 'org.opencadc:cadc-registry:[1.4,)'
     implementation 'javax.servlet:javax.servlet-api:3.1.0'
     
     testImplementation 'junit:junit:[4.13,5.0)'
