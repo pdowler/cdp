@@ -2,12 +2,15 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'application'
+    id 'checkstyle'
 }
 
 repositories {
     mavenCentral()
     mavenLocal()
 }
+
+apply from: '../opencadc.gradle'
 
 sourceCompatibility = 11
 
